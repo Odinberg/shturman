@@ -1,107 +1,89 @@
-# New Nx Repository
+# Штурман — AI-навигатор
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+**Интегративная программа глубинной саморегуляции.** Семь направлений самоисследования с AI-ассистентом.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Приложение встроено в закрытый клуб **Архипелаг** (VK Mini App). Работает как VK Mini App ID: `app54657016`.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/docs/technologies/typescript/introduction?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
-🚀 If you haven't connected to Nx Cloud yet, [complete your setup here](https://cloud.nx.app/get-started). Get faster builds with remote caching, distributed task execution, and self-healing CI. [See how your workspace can benefit](#nx-cloud).
-## Generate a library
+## Семь направлений
 
-```sh
-npx nx g @nx/js:lib packages/pkg1 --publishable --importPath=@my-org/pkg1
-```
+| # | Направление | Путь | Описание |
+|---|-------------|------|----------|
+| 1 | **Активный дневник** | `/journal` | Resonance — рефлексия и бонусы за глубину |
+| 2 | **Эмоциональный профиль** | `/emotional` | Предиктивная поддержка, биоритмы, аватар |
+| 3 | **Рефрейминг ситуаций** | `/reframing` | Когнитивная гибкость, ИИ-адвокат |
+| 4 | **Диалог с Тенью** | `/shadow` | Юнгианские практики, зеркальный дублёр |
+| 5 | **Сенсорные якоря** | `/sensory` | Телесный компас, кинетический дневник |
+| 6 | **Множественность Я** | `/self` | Субличности, круглый стол, переговорщик |
+| 7 | **Эффект Бабочки** | `/butterfly` | Фрактал дня, копилка чудес |
 
-## Run tasks
-
-To build the library use:
-
-```sh
-npx nx run pkg1:build
-```
-
-To run any task with Nx use:
-
-```sh
-npx nx run <project-name>:<target>
-```
-
-These targets are either [inferred automatically](https://nx.dev/docs/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/docs/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Versioning and releasing
-
-To version and release the library use
+## Архитектура
 
 ```
-npx nx release
+shturman/
+├── apps/
+│   └── frontend/        # Next.js 16 (React 19) — VK Mini App
+│       └── src/app/     # App Router, 7 direction pages
+│           ├── journal/
+│           ├── emotional/
+│           ├── reframing/
+│           ├── shadow/
+│           ├── sensory/
+│           ├── self/
+│           ├── butterfly/
+│           ├── philosophy/
+│           └── disclaimer/
+├── backend/
+│   └── app/
+│       ├── api/         # FastAPI, 60+ endpoints
+│       ├── models/      # 26 SQLAlchemy таблиц
+│       ├── core/        # Config, DB engine
+│       └── prompts/     # 17 AI-промптов для генераций
+├── docker-compose.yml   # postgres + redis + backend + frontend
+└── packages/
 ```
 
-Pass `--dry-run` to see what would happen without actually releasing the library.
+### Бэкенд
+- **FastAPI 0.119** — async, 60+ эндпоинтов по 7 направлениям
+- **PostgreSQL 16** + asyncpg + SQLAlchemy 2.0 — 26 таблиц
+- **Redis 7** — кеширование
+- **OpenAI** — AI-генерация (паттерны, рефрейминг, зеркальные письма)
+- **JWT-аутентификация** (python-jose)
 
-[Learn more about Nx release &raquo;](https://nx.dev/docs/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### Фронтенд
+- **Next.js 16** (Turbopack) — App Router
+- **React 19** — `use client` компоненты
+- Тёмная тема (gold/dark), карточный дизайн
+- Все страницы статически пререндерены
 
-## Keep TypeScript project references up to date
+## Запуск
 
-Nx automatically updates TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html) in `tsconfig.json` files to ensure they remain accurate based on your project dependencies (`import` or `require` statements). This sync is automatically done when running tasks such as `build` or `typecheck`, which require updated references to function correctly.
+```bash
+# Поднять всё (Docker)
+docker compose up -d --build
 
-To manually trigger the process to sync the project graph dependencies information to the TypeScript project references, run the following command:
-
-```sh
-npx nx sync
+# Бэкенд: http://localhost:8000
+# Фронтенд: http://localhost:3000
+# API docs: http://localhost:8000/api/docs
+# Swagger: http://localhost:8000/api/openapi.json
 ```
 
-You can enforce that the TypeScript project references are always in the correct state when running in CI by adding a step to your CI job configuration that runs the following command:
+```bash
+# Только бэкенд (для разработки)
+cd backend
+python3 -m uvicorn app.main:app --reload
 
-```sh
-npx nx sync:check
+# Только фронтенд
+cd apps/frontend
+pnpm nx dev frontend
 ```
 
-[Learn more about nx sync](https://nx.dev/reference/nx-commands#sync)
+## Конфиденциальность
 
-## Nx Cloud
+Приложение собирает дневниковые записи, эмоциональные чекины и сенсорные данные.
+Данные хранятся в зашифрованном виде, не передаются третьим лицам.
+Пользователь может запросить полное удаление данных.
+Подробнее: [Дисклеймер](/disclaimer).
 
-Nx Cloud ensures a [fast and scalable CI](https://nx.dev/nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+## Лицензия
 
-- [Remote caching](https://nx.dev/docs/features/ci-features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/docs/features/ci-features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/docs/features/ci-features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/docs/features/ci-features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Set up CI (non-Github Actions CI)
-
-**Note:** This is only required if your CI provider is not GitHub Actions.
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/docs/features/ci-features?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/docs/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## 🔗 Learn More
-
-- [Nx Documentation](https://nx.dev/docs)
-- [Crafting Your Workspace Tutorial](https://nx.dev/docs/getting-started/tutorials/crafting-your-workspace)
-- [Module Boundaries](https://nx.dev/docs/features/enforce-module-boundaries)
-- [Releasing Packages](https://nx.dev/docs/features/manage-releases)
-- [Nx Plugins](https://nx.dev/docs/concepts/nx-plugins)
-- [Nx Cloud](https://nx.dev/nx-cloud)
-
-## 💬 Community
-
-Join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [X (Twitter)](https://twitter.com/nxdevtools)
-- [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [YouTube](https://www.youtube.com/@nxdevtools)
-- [Blog](https://nx.dev/blog)
+Закрытый проект. Все права защищены. Клуб Архипелаг.
