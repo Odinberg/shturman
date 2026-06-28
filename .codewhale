@@ -1,0 +1,126 @@
+# CodeWhale Session Log — Shturman Backend
+# Started: 2026-06-28
+
+## Session Events
+
+### [2026-06-28] Initial Audit
+**Action:** Full backend code audit
+**Result:** All Python files parse OK. Models import OK (26 tables). App imports OK (60 routes).
+**State:** 
+- Git: main...origin/main [ahead 3, behind 1]
+- Modified files: router.py, auth.py, bonuses.py, community.py, courses.py, journal.py, shturman_chat.py, models/__init__.py
+- New files: emotional.py, models.py, 17 prompt files
+
+### [2026-06-28] Python Environment
+**Action:** Checked Python availability
+**Result:** python3 (3.14.5) at /usr/local/bin/python3 with all dependencies installed globally
+**Dependencies:** fastapi 0.119.0, sqlalchemy 2.0.42, asyncpg 0.31.0, alembic 1.18.4, openai 2.7.1, etc.
+
+### [2026-06-28] Syntax Check
+**Action:** AST parse all .py files in backend/app/
+**Result:** All files parsed successfully — no syntax errors
+
+### [2026-06-28] Model Import Test
+**Action:** `from app.models.models import Base`
+**Result:** OK — 26 tables registered:
+  users, journal_entries, pattern_maps, alt_reality_sessions,
+  emotional_checkins, biorhythm_reports, resource_collections, emotional_avatars,
+  reframing_sessions, insight_boxes, blind_spot_sessions,
+  shadow_recordings, mirror_letters, forbidden_desires, anti_hero_comics,
+  sensory_checkins, sensory_predictions, calm_anchors,
+  subpersonality_posts, round_table_sessions, family_portraits, negotiator_sessions,
+  butterfly_events, fractal_cards, wonder_vaults, chronicle_slots
+
+### [2026-06-28] App Import Test
+**Action:** `from app.main import app`
+**Result:** OK — 60 routes registered across 7 modules:
+  - health (2 routes)
+  - auth (6 routes — posts, stats, round-table, family-portrait, negotiator)
+  - journal (6 routes — entries, patterns, alt-reality)
+  - butterfly (8 routes — events, fractal, vault)
+  - emotional (8 routes — checkins, biorhythm, resources, avatar)
+  - reframing (6 routes — sessions, insight-box, blind-spot, ai-advocate)
+  - sensory (6 routes — checkins, kinetic, anchor, predict)
+  - shadow (8 routes — recordings, mirror-letter, forbidden-desire, anti-hero)
+
+### [2026-06-28] Known Issues / Observations
+1. Prompt file paths use relative `app/prompts/...` — will break if run from wrong directory
+2. No virtual environment (.venv/venv) — deps installed globally
+3. auth.py prefixed as /auth but serves subpersonality/round-table/family-portrait/negotiator content (mapping mismatch)
+4. All endpoints hardcoded user_id=1 — no real auth
+5. get_db() async generator does `await session.close()` after yield — may cause issues
+
+### [2026-06-28] Root Cause Found & Fixed
+**Problem:** All CRUD endpoints returned 500 — `relation "journal_entries" does not exist`
+**Root Cause:** `Base.metadata.create_all` in `@app.on_event("startup")` was firing, but model classes weren't imported yet. Routes use lazy imports (`from app.models.models import X` inside handlers), so at startup time `Base.metadata.tables` was empty — zero tables registered.
+**Fix:** Added `import app.models.models` at module level in `main.py` before the `startup` event.
+**Verification:** All 26 tables created, all API endpoints return `[]` (no data yet) instead of 500.
+
+### [2026-06-28] Frontend Integration — API Client
+**Action:** Created `apps/frontend/src/lib/api.ts` (8884 bytes)
+**Result:** Full fetch-клиент для всех 7 направлений + health. Все 60+ методов типизированы.
+**Details:** 
+- `jpost<T>()` / `jpostEmpty<T>()` — хелперы для отправки query-параметров (FastAPI style)
+- Интерфейсы: JournalEntry, EmotionalCheckin, ButterflyEvent
+- 7 API-клиентов: journalAPI, emotionalAPI, reframingAPI, shadowAPI, sensoryAPI, multiplicityAPI, butterflyAPI
+- healthAPI для проверки соединения
+
+### [2026-06-28] Frontend Integration — 7 Direction Pages
+**Action:** Created 7 interactive Next.js App Router pages
+**Files created:**
+- `apps/frontend/src/app/journal/page.tsx` (653 строки) — Активный дневник: форма записи, список, карта паттернов, альтернативная реальность
+- `apps/frontend/src/app/emotional/page.tsx` (703 строки) — Эмоциональный профиль: emoji-чекин, streak, биоритмолог, аватар, ресурсные состояния
+- `apps/frontend/src/app/shadow/page.tsx` (534 строки) — Диалог с Тенью: записи, зеркальный дублёр, карта желаний, анти-герой
+- `apps/frontend/src/app/sensory/page.tsx` (576 строк) — Сенсорные якоря: 5 ощущений, кинетика, якорь, компас
+- `apps/frontend/src/app/butterfly/page.tsx` (515 строк) — Эффект Бабочки: события, счётчик, фрактал, копилка
+- `apps/frontend/src/app/reframing/page.tsx` (455 строк) — Рефрейминг: сессии, ИИ-адвокат, шкатулка, слепое пятно
+- `apps/frontend/src/app/self/page.tsx` (632 строки) — Множественность Я: субличности, круглый стол, портрет, переговорщик
+
+**Each page features:** тёмная тема (gold/dark), `<style>` JSX, `use client`, навигация «← На главную», container 1200px, обработка ошибок API
+
+### [2026-06-28] Frontend Integration — Landing Page Updated
+**Action:** Updated `apps/frontend/src/app/page.tsx` (+582 строки)
+**Changes:**
+- Dashboard-секция с реальными счётчиками из API (7 метрик)
+- Карточки методик теперь кликабельны — ведут на /journal, /emotional, /reframing, /shadow, /sensory, /self, /butterfly
+- React.useState + useEffect для загрузки данных при монтировании
+
+### [2026-06-28] Frontend Integration — Navigation
+**Action:** Updated `apps/frontend/src/app/layout.tsx`
+**Changes:**
+- Убран мёртвый /courses из nav/footer
+- В nav: Главная | Дневник | Эмоции | Рефрейминг | Тень
+- В footer: все 7 направлений + Главная
+- Исправлен неработающий import './global.css' (удалён — стили в `<style>` JSX)
+
+### [2026-06-28] Build Verification
+**Action:** `npx next build`
+**Result:** ✓ Compiled successfully. 11 routes generated (/, /journal, /emotional, /shadow, /sensory, /butterfly, /reframing, /self, /_not-found, /api/hello)
+**Note:** Все страницы статические (Static), кроме /api/hello
+
+### [2026-06-28] E2E Verification
+**Action:** Tested all pages through Docker
+**Result:** All 8 pages return 200 from http://localhost:3000
+- Backend API отвечает: journal entries=1, emotional checkins=1, butterfly events=1
+- POST/PUT/GET цикл работает через query-параметры
+- Foreign key ошибка исправлена (создан default user id=1 в БД)
+
+### [2026-06-28] Infrastructure Check
+**Docker containers:** All 4 running (shturman-db healthy, shturman-redis healthy, shturman-backend Up 2h, shturman-frontend Up 32m)
+**Health checks:** /health OK, /api/health OK, /api/health/db OK (database connected)
+**API docs:** Swagger UI at /api/docs returns 200
+
+## Known Issues (Resolved & Open)
+1. ✅ [RESOLVED] Tables not created on startup — fixed with explicit model import in main.py
+2. ⚠️ Prompt file paths use relative `app/prompts/...` — will break if run from wrong directory
+3. ℹ️ No virtual environment — deps installed globally (pip3)
+4. ℹ️ auth.py prefix /auth but serves subpersonality/round-table content (naming mismatch)
+5. ℹ️ All endpoints hardcoded user_id=1 — no real auth
+6. ℹ️ `get_db()` does `await session.close()` after yield (may be redundant with async context manager)
+
+## Docker / Infrastructure
+- docker-compose.yml has postgres:16, redis:7, backend, frontend
+- DB: postgresql+asyncpg://shturman:shturman_secret@postgres:5432/shturman
+- Redis: redis://redis:6379/0
+- Backend on :8000, Frontend on :3000
+

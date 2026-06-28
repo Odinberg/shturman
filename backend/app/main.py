@@ -10,6 +10,9 @@ from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.router import api_router
 
+# Ensure all models are registered on Base.metadata before create_all
+import app.models.models  # noqa: F401
+
 # Create tables (dev mode; production uses Alembic migrations)
 # Base.metadata.create_all will be called on startup
 

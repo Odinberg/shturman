@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { journalAPI, emotionalAPI, butterflyAPI, sensoryAPI, shadowAPI, reframingAPI, multiplicityAPI } from '../lib/api';
 
 const directions = [
   {
@@ -89,7 +90,106 @@ const directions = [
   },
 ];
 
+interface DashboardStats {
+  journal: number;
+  emotional: number;
+  butterfly: number;
+  sensory: number;
+  shadow: number;
+  reframing: number;
+  self: number;
+}
+
+function Dashboard({ stats }: { stats: DashboardStats }) {
+  const items = [
+    { label: 'Записей в дневнике', count: stats.journal, href: '/journal', icon: '📝' },
+    { label: 'Эмоц. чекинов', count: stats.emotional, href: '/emotional', icon: '📊' },
+    { label: 'Рефреймингов', count: stats.reframing, href: '/reframing', icon: '🧘' },
+    { label: 'Сенсорных чекинов', count: stats.sensory, href: '/sensory', icon: '🎭' },
+    { label: 'Теневых записей', count: stats.shadow, href: '/shadow', icon: '🖤' },
+    { label: 'Субличностей', count: stats.self, href: '/self', icon: '🧩' },
+    { label: 'Событий бабочки', count: stats.butterfly, href: '/butterfly', icon: '🌱' },
+  ];
+
+  return (
+    <section className="content-section" id="dashboard">
+      <div className="container">
+        <div className="section-header fade-in">
+          <h2 className="section-title">Ваш прогресс</h2>
+          <p className="section-subtitle">Сводка по всем направлениям самоисследования</p>
+        </div>
+        <div className="dashboard-grid fade-in stagger-delay-1">
+          {items.map((item) => (
+            <a key={item.label} href={item.href} className="dashboard-card">
+              <span className="dash-icon">{item.icon}</span>
+              <span className="dash-count">{item.count}</span>
+              <span className="dash-label">{item.label}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+      <style>{`
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 1rem;
+          margin-top: var(--spacing-md);
+        }
+        .dashboard-card {
+          background: var(--color-card);
+          border: 1px solid var(--color-border);
+          border-radius: var(--border-radius);
+          padding: 1.25rem;
+          text-align: center;
+          text-decoration: none;
+          transition: var(--transition);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.35rem;
+        }
+        .dashboard-card:hover {
+          border-color: var(--color-gold);
+          transform: translateY(-3px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+        .dash-icon { font-size: 1.6rem; }
+        .dash-count {
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: var(--color-gold);
+          font-family: var(--font-cormorant), serif;
+        }
+        .dash-label {
+          font-size: 0.75rem;
+          color: var(--color-text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+      `}</style>
+    </section>
+  );
+}
+
 export default function Home() {
+  const [stats, setStats] = useState<DashboardStats>({ journal:0, emotional:0, butterfly:0, sensory:0, shadow:0, reframing:0, self:0 });
+  const [statsLoaded, setStatsLoaded] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      journalAPI.list().then(r => r.length).catch(() => 0),
+      emotionalAPI.listCheckins().then(r => r.length).catch(() => 0),
+      butterflyAPI.listEvents().then(r => r.length).catch(() => 0),
+      sensoryAPI.listCheckins().then(r => r.length).catch(() => 0),
+      shadowAPI.listRecordings().then(r => r.length).catch(() => 0),
+      reframingAPI.listSessions().then(r => r.length).catch(() => 0),
+      multiplicityAPI.listPosts().then(r => r.length).catch(() => 0),
+    ]).then(([j, e, b, se, sh, r, m]) => {
+      setStats({ journal: j, emotional: e, butterfly: b, sensory: se, shadow: sh, reframing: r, self: m });
+      setStatsLoaded(true);
+    });
+  }, []);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -373,6 +473,9 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Дашборд */}
+      {statsLoaded && <Dashboard stats={stats} />}
+
       {/* О проекте */}
       <section className="content-section" id="about">
         <div className="container">
@@ -431,22 +534,29 @@ export default function Home() {
           </div>
 
           <div className="directions-grid">
-            {directions.map((d, i) => (
-              <div
-                key={d.id}
-                className={`direction-card fade-in stagger-delay-${(i % 4) + 1}`}
-              >
-                <span className="direction-icon">{d.icon}</span>
-                <h3 className="direction-title">{d.title}</h3>
-                <p className="direction-subtitle">{d.subtitle}</p>
-                <div className="direction-condition">{d.condition}</div>
-                <ul className="direction-bonuses">
-                  {d.bonuses.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            {directions.map((d, i) => {
+              const slugMap: Record<string, string> = {
+                resonance: '/journal', emotional: '/emotional', reframing: '/reframing',
+                shadow: '/shadow', sensory: '/sensory', multiplicity: '/self', butterfly: '/butterfly',
+              };
+              return (
+                <a
+                  key={d.id}
+                  href={slugMap[d.id] || '#'}
+                  className={`direction-card fade-in stagger-delay-${(i % 4) + 1}`}
+                >
+                  <span className="direction-icon">{d.icon}</span>
+                  <h3 className="direction-title">{d.title}</h3>
+                  <p className="direction-subtitle">{d.subtitle}</p>
+                  <div className="direction-condition">{d.condition}</div>
+                  <ul className="direction-bonuses">
+                    {d.bonuses.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </a>
+              );
+            })}
 
             {/* Архимедов рычаг */}
             <div className="direction-card archimedean fade-in stagger-delay-4">

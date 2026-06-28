@@ -1,4 +1,3 @@
-import './global.css';
 import { Inter, Cormorant_Garamond } from 'next/font/google';
 
 const inter = Inter({
@@ -273,7 +272,10 @@ export default function RootLayout({
             </a>
             <nav className="nav-links">
               <a href="/" className="nav-link">Главная</a>
-              <a href="/courses" className="nav-link">Курсы</a>
+              <a href="/journal" className="nav-link">Дневник</a>
+              <a href="/emotional" className="nav-link">Эмоции</a>
+              <a href="/philosophy" className="nav-link">Философия</a>
+              <a href="/disclaimer" className="nav-link">Дисклеймер</a>
             </nav>
           </div>
         </header>
@@ -287,7 +289,15 @@ export default function RootLayout({
             <div className="footer-logo">✦ Штурман</div>
             <div className="footer-links-group">
               <a href="/" className="footer-link">Главная</a>
-              <a href="/courses" className="footer-link">Курсы</a>
+              <a href="/journal" className="footer-link">Дневник</a>
+              <a href="/emotional" className="footer-link">Эмоции</a>
+              <a href="/reframing" className="footer-link">Рефрейминг</a>
+              <a href="/shadow" className="footer-link">Тень</a>
+              <a href="/sensory" className="footer-link">Сенсорика</a>
+              <a href="/self" className="footer-link">Я-личности</a>
+              <a href="/butterfly" className="footer-link">Бабочка</a>
+              <a href="/philosophy" className="footer-link">Философия</a>
+              <a href="/disclaimer" className="footer-link">Дисклеймер</a>
             </div>
             <div className="footer-copy">
               © {new Date().getFullYear()} Штурман. Все права защищены.
