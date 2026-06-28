@@ -6,6 +6,22 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
+let _authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  _authToken = token;
+  if (token) localStorage.setItem('shturman_token', token);
+  else localStorage.removeItem('shturman_token');
+}
+
+export function getAuthToken(): string | null {
+  if (_authToken) return _authToken;
+  _authToken = localStorage.getItem('shturman_token');
+  return _authToken;
+}
+
 async function request<T>(path: string, options?: RequestInit, query?: Record<string, any>): Promise<T> {
   let url = `${API_BASE}${path}`;
   if (query) {
@@ -16,10 +32,10 @@ async function request<T>(path: string, options?: RequestInit, query?: Record<st
     const qs = params.toString();
     if (qs) url += `?${qs}`;
   }
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  });
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...((options?.headers as Record<string, string>) || {}) };
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API ${res.status}: ${text}`);
@@ -36,6 +52,14 @@ function jpostEmpty<T>(path: string): Promise<T> {
 }
 
 // ─── Health ────────────────────────────────────────────────────────────────
+
+export const authAPI = {
+  vkLogin: (vkParams: Record<string, string>) =>
+    jpost<{ access_token: string; token_type: string; user_id: number; username: string }>(
+      '/auth/vk',
+      vkParams
+    ),
+};
 
 export const healthAPI = {
   get: () => request<{ status: string; service: string }>('/health'),

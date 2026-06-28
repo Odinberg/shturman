@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { journalAPI, emotionalAPI, butterflyAPI, sensoryAPI, shadowAPI, reframingAPI, multiplicityAPI } from '../lib/api';
+import { useVkAuth } from '../lib/vk-auth';
 
 const directions = [
   {
@@ -172,6 +173,7 @@ function Dashboard({ stats }: { stats: DashboardStats }) {
 }
 
 export default function Home() {
+  const vkAuth = useVkAuth();
   const [stats, setStats] = useState<DashboardStats>({ journal:0, emotional:0, butterfly:0, sensory:0, shadow:0, reframing:0, self:0 });
   const [statsLoaded, setStatsLoaded] = useState(false);
 
@@ -465,6 +467,20 @@ export default function Home() {
               Семь направлений самоисследования. От рефлексии — к телесным якорям,
               от диалога с тенью — к эффекту бабочки. Выберите, с чего начать.
             </p>
+            {vkAuth.ready && (
+              <p style={{
+                color: vkAuth.username ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                fontSize: '0.9rem',
+                marginTop: '1rem',
+                fontWeight: 400,
+              }}>
+                {vkAuth.username
+                  ? `⚡ ${vkAuth.username}`
+                  : vkAuth.error
+                    ? `⚠️ ${vkAuth.error}`
+                    : ''}
+              </p>
+            )}
             <a href="#directions" className="hero-cta">
               Методики
               <span>↓</span>

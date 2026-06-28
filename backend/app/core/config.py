@@ -25,8 +25,20 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
+    # VK Mini App
+    VK_APP_ID: str = "54657016"
+    VK_APP_SECRET: str = ""
+
+    # Domain
+    DOMAIN: str = "vnutrenniy-kompas.ru"
+
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://vnutrenniy-kompas.ru",
+        "http://vnutrenniy-kompas.ru",
+    ]
 
     class Config:
         env_file = ".env"
