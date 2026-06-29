@@ -15,8 +15,7 @@ RUN pnpm install --frozen-lockfile --prod
 FROM deps AS builder
 
 WORKDIR /app
-ENV CI=true
-RUN pnpm install --frozen-lockfile
+RUN CI=true pnpm install --frozen-lockfile
 
 COPY apps/frontend ./apps/frontend
 COPY tsconfig.base.json ./
