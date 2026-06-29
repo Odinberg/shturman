@@ -124,3 +124,69 @@
 - Redis: redis://redis:6379/0
 - Backend on :8000, Frontend on :3000
 
+### [2026-06-28] Страницы дисклеймера и философии
+**Action:** Созданы 2 страницы Next.js App Router
+**Файлы:**
+- `apps/frontend/src/app/disclaimer/page.tsx` — дисклеймер, политика конфиденциальности, контакты экстренной помощи (МЧС, 112, телефон доверия)
+- `apps/frontend/src/app/philosophy/page.tsx` — философия проекта, 7 методик с научными авторами, как пользоваться, что даёт
+- `vk-mini-app-description.md` — описание для VK
+- `vk-mini-app-preview.txt` — текст превью-карточки
+- `vk-mini-app-privacy.txt` — политика конфиденциальности для VK
+
+### [2026-06-28] Иконки VK Mini App
+**Action:** Сгенерированы иконки через Pillow (тёмный фон + золотой компас)
+**Файлы в `assets/vk-icons/`:**
+- `icon_universal_576.png` — универсальная иконка (576×576, 12 KB)
+- `icon_catalog_278.png` — иконка каталога (278×278, 5.3 KB)
+- `icon_small_150.png` — маленькая иконка (150×150, 2.8 KB)
+- `favicon_32.png` — фавикон (32×32, 579 B)
+- `snippet_big_1120x630.png` — большой сниппет (1120×630, 32 KB)
+- `splash_1080x1920.png` — экран запуска (1080×1920, 49 KB)
+
+### [2026-06-28] GitHub репозиторий
+**Action:** Создан публичный репозиторий Odinberg/shturman
+**URL:** https://github.com/Odinberg/shturman
+**Ветка:** main (force push из-за workflow scope)
+**Удалены:** .github/workflows/ci.yml из истории
+
+### [2026-06-28] Домен и деплой
+**Action:** Настроен продакшн-стек для vnutrenniy-kompas.ru
+**Файлы:**
+- `docker-compose.prod.yml` — production compose с отдельными volume/networks
+- `nginx/nginx.conf` — reverse proxy (80 → frontend:3000, /api → backend:8000)
+- `apps/frontend/Dockerfile.prod` — production Dockerfile (multi-stage)
+- `deploy.sh` — скрипт деплоя с health-чеками
+- `backend/app/core/config.py` — добавлен DOMAIN, VK_APP_ID/VK_APP_SECRET
+**DNS:** vnutrenniy-kompas.ru → 91.247.233.83
+
+### [2026-06-28] Системная интеграция Synology
+**Action:** Деплой на Synology NAS (192.168.0.72)
+**Проблемы:**
+- DSM nginx на 80/443 → пришлось менять конфиг
+- Docker без сокета в PATH → alias к /volume1/@appstore/ContainerManager/usr/bin/docker
+- Let's Encrypt через DNS challenge (порт 80 занят DSM)
+- `docker compose` без TTY → `CI=true` в Dockerfile
+**Решение:** DSM Reverse Proxy: 443 → localhost:9090 (shturman-frontend)
+**Статус:** Все 5 контейнеров работают, ментор остался на :8080
+**URL:** https://vnutrenniy-kompas.ru (Штурман), http://192.168.0.72:8080 (ментор)
+
+### [2026-06-28] VK ID Аутентификация
+**Action:** Реализован вход через VK ID
+**Бэкенд:**
+- `backend/app/services/vk_auth.py` — HMAC-SHA256 верификация VK подписи
+- `backend/app/api/routes/vk_auth.py` — POST /api/auth/vk, создаёт/ищет пользователя, возвращает JWT
+- `backend/app/core/database.py` — get_current_user dependency (JWT → VK params → dev fallback)
+**Фронтенд:**
+- `apps/frontend/src/lib/vk-auth.ts` — useVkAuth() хук (авто-извлечение VK params из URL)
+- `apps/frontend/src/lib/api.ts` — authAPI.vkLogin(), токен в Authorization header
+- `apps/frontend/src/lib/vk-bridge.tsx` — VkBridgeProvider (инициализация VK Mini App)
+**Примечание:** VK_APP_SECRET = 7d0193437d0193437d019343857e406cbb77d017d0193431740d791f1210944dd8b31aa
+
+### [2026-06-28] DeepSeek AI (вместо OpenAI)
+**Action:** Смена AI-провайдера с OpenAI на DeepSeek
+**Файлы:**
+- `backend/app/core/config.py` — new: OPENAI_API_BASE=https://api.deepseek.com, OPENAI_MODEL=deepseek-chat
+- `backend/app/core/ai.py` — хелпер get_ai_client() / get_ai_model()
+- Все route файлы — заменён AsyncOpenAI на get_ai_client()
+**API ключ:** sk-e8f4ec3c7d2341eeb94df58b03263220
+
