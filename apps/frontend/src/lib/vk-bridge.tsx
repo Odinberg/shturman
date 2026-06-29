@@ -14,7 +14,7 @@ interface VkBridgeState {
  * Встраивается в RootLayout.
  */
 export function VkBridgeProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<VkBridgeState>({
+  const [, setState] = useState<VkBridgeState>({
     ready: false,
     isVkApp: false,
     vkUserId: null,
