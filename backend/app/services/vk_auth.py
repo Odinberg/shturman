@@ -1,5 +1,12 @@
 """
 VK Mini App — верификация подписи запроса.
+
+По документации VK (https://dev.vk.com/mini-apps/development/signing):
+1. Берутся все query-параметры, кроме sign, sign_query, vk_viewer_group_role.
+2. Ключи сортируются алфавитно.
+3. Строка вида k1=v1&k2=v2 (значения URL-encoded как в исходном запросе).
+4. HMAC-SHA256: ключ = app_secret, сообщение = строка параметров.
+5. Результат сравнивается с параметром sign.
 """
 
 import hashlib
@@ -10,32 +17,37 @@ from typing import Optional
 
 def verify_vk_signature(query_string: str, app_secret: str) -> bool:
     """
-    Проверяет подпись VK Mini App.
-    Алгоритм: отсортировать все параметры кроме sign,
-    склеить их в строку ?k=v&k=v, добавить секретный ключ,
-    вычислить SHA256 и сравнить с параметром sign.
+    Проверяет подпись VK Mini App по алгоритму HMAC-SHA256.
     """
-    # Парсим query string
+    # Парсим query string (значения автоматически URL-decoded)
     params = urllib.parse.parse_qs(query_string, keep_blank_values=True)
-    # Приводим к dict[str, str] (берём первое значение)
     flat = {k: v[0] for k, v in params.items()}
 
     received_sign = flat.pop("sign", None)
     if not received_sign:
         return False
 
-    # Сортируем ключи
-    sorted_keys = sorted(flat.keys())
-    # Формируем строку вида k1=v1&k2=v2
-    param_string = "&".join(
-        f"{k}={flat[k]}" for k in sorted_keys if k.startswith("vk_")
-    )
+    # Исключаем sign, sign_query, vk_viewer_group_role
+    exclude = {"sign", "sign_query", "vk_viewer_group_role"}
+    filtered = {k: v for k, v in flat.items() if k not in exclude}
 
-    # Добавляем секретный ключ
-    signed_string = param_string + app_secret
+    # Сортируем ключи алфавитно
+    sorted_keys = sorted(filtered.keys())
+
+    # Формируем строку с URL-кодированными значениями (как в исходном запросе)
+    param_parts = []
+    for k in sorted_keys:
+        val = str(filtered[k])
+        # URL-encode значение, чтобы соответствовать оригинальной query string
+        encoded_val = urllib.parse.quote(val, safe='')
+        param_parts.append(f"{k}={encoded_val}")
+
+    param_string = "&".join(param_parts)
+
+    # HMAC-SHA256: ключ = app_secret, сообщение = строка параметров
     computed_sign = hmac.new(
         app_secret.encode("utf-8"),
-        signed_string.encode("utf-8"),
+        param_string.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
 
