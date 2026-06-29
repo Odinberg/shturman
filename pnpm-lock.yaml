@@ -72,6 +72,9 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@vkontakte/vk-bridge':
+        specifier: ^3.0.2
+        version: 3.0.2
       next:
         specifier: ~16.1.6
         version: 16.1.7(@babel/core@7.29.7)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.101.0)
@@ -1962,6 +1965,9 @@ packages:
   '@swc/helpers@0.5.18':
     resolution: {integrity: sha512-TXTnIcNJQEKwThMMqBXsZ4VGAza6bvN4pa41Rkqoio6QBKMvo+5lexeTMScGCIxtzgQJzElcvIltani+adC5PQ==}
 
+  '@swc/helpers@0.5.23':
+    resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
+
   '@swc/types@0.1.27':
     resolution: {integrity: sha512-K6h3iUlqeM946U4sXFYeahefR1YBbXJvko+hv8WS8/0BNJ4OHiHRywMnQUJCqkR7Y9+hqQ1TvEpiKqUhz7NEFg==}
 
@@ -2036,6 +2042,9 @@ packages:
 
   '@ungap/structured-clone@1.3.2':
     resolution: {integrity: sha512-5jsZFwgR5rTdKwidH9Qmat75RKwqfpKlWWB1frDkljN127mwqBu8K0PYo7/hFpF03IEJpfVPpCQDY/eDx3iHvA==}
+
+  '@vkontakte/vk-bridge@3.0.2':
+    resolution: {integrity: sha512-MTp+nl0/jH4Sa2TXDyxNfy9VkhOhRQR1oQ4yhvthVDA4aWUa26npns7bRgfTuR3xDVGFiqW7zAwLnwcv3mL+dA==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -7101,6 +7110,10 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  '@swc/helpers@0.5.23':
+    dependencies:
+      tslib: 2.8.1
+
   '@swc/types@0.1.27':
     dependencies:
       '@swc/counter': 0.1.3
@@ -7182,6 +7195,10 @@ snapshots:
       '@types/yargs-parser': 21.0.3
 
   '@ungap/structured-clone@1.3.2': {}
+
+  '@vkontakte/vk-bridge@3.0.2':
+    dependencies:
+      '@swc/helpers': 0.5.23
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:
