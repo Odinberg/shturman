@@ -17,6 +17,10 @@ FROM deps AS builder
 WORKDIR /app
 RUN CI=true pnpm install --frozen-lockfile
 
+# NEXT_PUBLIC_* vars MUST be set at BUILD time — Next.js bakes them into JS bundle
+ARG NEXT_PUBLIC_API_URL=https://vnutrenniy-kompas.ru/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 COPY apps/frontend ./apps/frontend
 COPY tsconfig.base.json ./
 COPY nx.json ./

@@ -56,6 +56,7 @@ async def vk_oauth_callback(
             "client_secret": settings.VK_WEB_CLIENT_SECRET,
             "redirect_uri": f"https://{settings.DOMAIN}/auth/callback",
             "code": code,
+            "v": "5.199",
         })
 
     token_data = resp.json()

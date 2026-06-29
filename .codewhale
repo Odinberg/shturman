@@ -1,192 +1,214 @@
-# CodeWhale Session Log — Shturman Backend
-# Started: 2026-06-28
+# Полный аудит проекта Штурман
+## Дата: 2026-06-28 | Аналитик: CodeWhale (deepseek-v4-flash)
 
-## Session Events
+---
 
-### [2026-06-28] Initial Audit
-**Action:** Full backend code audit
-**Result:** All Python files parse OK. Models import OK (26 tables). App imports OK (60 routes).
-**State:** 
-- Git: main...origin/main [ahead 3, behind 1]
-- Modified files: router.py, auth.py, bonuses.py, community.py, courses.py, journal.py, shturman_chat.py, models/__init__.py
-- New files: emotional.py, models.py, 17 prompt files
+## Идентификация
 
-### [2026-06-28] Python Environment
-**Action:** Checked Python availability
-**Result:** python3 (3.14.5) at /usr/local/bin/python3 with all dependencies installed globally
-**Dependencies:** fastapi 0.119.0, sqlalchemy 2.0.42, asyncpg 0.31.0, alembic 1.18.4, openai 2.7.1, etc.
+- **Название**: Штурман — AI-навигатор клуба «Архипелаг»
+- **Домен**: vnutrenniy-kompas.ru (Synology NAS, 192.168.0.72)
+- **VK Mini App**: ID `54657016` (основной), ID `54657524` (веб-версия)
+- **Лицензия**: Закрытый проект, все права защищены
+- **Git**: локальный master, ~12 коммитов от `k1046114`
 
-### [2026-06-28] Syntax Check
-**Action:** AST parse all .py files in backend/app/
-**Result:** All files parsed successfully — no syntax errors
+---
 
-### [2026-06-28] Model Import Test
-**Action:** `from app.models.models import Base`
-**Result:** OK — 26 tables registered:
-  users, journal_entries, pattern_maps, alt_reality_sessions,
-  emotional_checkins, biorhythm_reports, resource_collections, emotional_avatars,
-  reframing_sessions, insight_boxes, blind_spot_sessions,
-  shadow_recordings, mirror_letters, forbidden_desires, anti_hero_comics,
-  sensory_checkins, sensory_predictions, calm_anchors,
-  subpersonality_posts, round_table_sessions, family_portraits, negotiator_sessions,
-  butterfly_events, fractal_cards, wonder_vaults, chronicle_slots
+## 1. Архитектура (общая схема)
 
-### [2026-06-28] App Import Test
-**Action:** `from app.main import app`
-**Result:** OK — 60 routes registered across 7 modules:
-  - health (2 routes)
-  - auth (6 routes — posts, stats, round-table, family-portrait, negotiator)
-  - journal (6 routes — entries, patterns, alt-reality)
-  - butterfly (8 routes — events, fractal, vault)
-  - emotional (8 routes — checkins, biorhythm, resources, avatar)
-  - reframing (6 routes — sessions, insight-box, blind-spot, ai-advocate)
-  - sensory (6 routes — checkins, kinetic, anchor, predict)
-  - shadow (8 routes — recordings, mirror-letter, forbidden-desire, anti-hero)
+```
+┌──────────┐     ┌──────────────┐     ┌───────────┐     ┌────────────┐
+│ Browser  │────▶│ Nginx (:80)  │────▶│ Frontend  │────▶│ Backend    │
+│ VK App   │     │ reverse_proxy│     │ (:3000)   │     │ (:8000)    │
+│          │     │              │     │ Next.js16 │     │ FastAPI    │
+└──────────┘     └──────────────┘     ├───────────┤     ├────────────┤
+                                      │ AI Client │     │ PostgreSQL │
+                                      │ VK Bridge │     │ Redis 7    │
+                                      └───────────┘     └────────────┘
+                                          │ openai│
+                                          ▼
+                                  ┌──────────────────┐
+                                  │ DeepSeek Chat API │
+                                  └──────────────────┘
+```
 
-### [2026-06-28] Known Issues / Observations
-1. Prompt file paths use relative `app/prompts/...` — will break if run from wrong directory
-2. No virtual environment (.venv/venv) — deps installed globally
-3. auth.py prefixed as /auth but serves subpersonality/round-table/family-portrait/negotiator content (mapping mismatch)
-4. All endpoints hardcoded user_id=1 — no real auth
-5. get_db() async generator does `await session.close()` after yield — may cause issues
+**Два режима развёртывания:**
+- **Dev**: `docker-compose.yml` — hot-reload, DEBUG=true, порты 5432/6379/8000/3000
+- **Prod**: `docker-compose.prod.yml` — Synology, порты 9091(backend)/9090(frontend)
 
-### [2026-06-28] Root Cause Found & Fixed
-**Problem:** All CRUD endpoints returned 500 — `relation "journal_entries" does not exist`
-**Root Cause:** `Base.metadata.create_all` in `@app.on_event("startup")` was firing, but model classes weren't imported yet. Routes use lazy imports (`from app.models.models import X` inside handlers), so at startup time `Base.metadata.tables` was empty — zero tables registered.
-**Fix:** Added `import app.models.models` at module level in `main.py` before the `startup` event.
-**Verification:** All 26 tables created, all API endpoints return `[]` (no data yet) instead of 500.
+---
 
-### [2026-06-28] Frontend Integration — API Client
-**Action:** Created `apps/frontend/src/lib/api.ts` (8884 bytes)
-**Result:** Full fetch-клиент для всех 7 направлений + health. Все 60+ методов типизированы.
-**Details:** 
-- `jpost<T>()` / `jpostEmpty<T>()` — хелперы для отправки query-параметров (FastAPI style)
-- Интерфейсы: JournalEntry, EmotionalCheckin, ButterflyEvent
-- 7 API-клиентов: journalAPI, emotionalAPI, reframingAPI, shadowAPI, sensoryAPI, multiplicityAPI, butterflyAPI
-- healthAPI для проверки соединения
+## 2. Бэкенд: FastAPI (Python 3.12)
 
-### [2026-06-28] Frontend Integration — 7 Direction Pages
-**Action:** Created 7 interactive Next.js App Router pages
-**Files created:**
-- `apps/frontend/src/app/journal/page.tsx` (653 строки) — Активный дневник: форма записи, список, карта паттернов, альтернативная реальность
-- `apps/frontend/src/app/emotional/page.tsx` (703 строки) — Эмоциональный профиль: emoji-чекин, streak, биоритмолог, аватар, ресурсные состояния
-- `apps/frontend/src/app/shadow/page.tsx` (534 строки) — Диалог с Тенью: записи, зеркальный дублёр, карта желаний, анти-герой
-- `apps/frontend/src/app/sensory/page.tsx` (576 строк) — Сенсорные якоря: 5 ощущений, кинетика, якорь, компас
-- `apps/frontend/src/app/butterfly/page.tsx` (515 строк) — Эффект Бабочки: события, счётчик, фрактал, копилка
-- `apps/frontend/src/app/reframing/page.tsx` (455 строк) — Рефрейминг: сессии, ИИ-адвокат, шкатулка, слепое пятно
-- `apps/frontend/src/app/self/page.tsx` (632 строки) — Множественность Я: субличности, круглый стол, портрет, переговорщик
+### 2.1 Core-слой
 
-**Each page features:** тёмная тема (gold/dark), `<style>` JSX, `use client`, навигация «← На главную», container 1200px, обработка ошибок API
+| Файл | Назначение |
+|------|------------|
+| `backend/app/core/config.py` | pydantic-settings из .env: OPENAI_API_KEY, JWT_SECRET, VK_APP_SECRET, VK_WEB_CLIENT_SECRET |
+| `backend/app/core/database.py` | async SQLAlchemy 2.0 + asyncpg, пул 20/10, get_db() yield-зависимость |
+| `backend/app/core/ai.py` | AsyncOpenAI -> api.deepseek.com, модель deepseek-chat |
 
-### [2026-06-28] Frontend Integration — Landing Page Updated
-**Action:** Updated `apps/frontend/src/app/page.tsx` (+582 строки)
-**Changes:**
-- Dashboard-секция с реальными счётчиками из API (7 метрик)
-- Карточки методик теперь кликабельны — ведут на /journal, /emotional, /reframing, /shadow, /sensory, /self, /butterfly
-- React.useState + useEffect для загрузки данных при монтировании
+### 2.2 Модели (26 таблиц SQLAlchemy)
 
-### [2026-06-28] Frontend Integration — Navigation
-**Action:** Updated `apps/frontend/src/app/layout.tsx`
-**Changes:**
-- Убран мёртвый /courses из nav/footer
-- В nav: Главная | Дневник | Эмоции | Рефрейминг | Тень
-- В footer: все 7 направлений + Главная
-- Исправлен неработающий import './global.css' (удалён — стили в `<style>` JSX)
+| # | Направление | Основная таблица | Бонусные таблицы |
+|---|-------------|------------------|-------------------|
+| 1 | Активный дневник | `journal_entries` | `pattern_maps`, `alt_reality_sessions` |
+| 2 | Эмоциональный профиль | `emotional_checkins` | `biorhythm_reports`, `resource_collections`, `emotional_avatars` |
+| 3 | Рефрейминг | `reframing_sessions` | `insight_boxes`, `blind_spot_sessions` |
+| 4 | Диалог с Тенью | `shadow_recordings` | `mirror_letters`, `forbidden_desires`, `anti_hero_comics` |
+| 5 | Сенсорные якоря | `sensory_checkins` | `sensory_predictions`, `calm_anchors` |
+| 6 | Множественность Я | `subpersonality_posts` | `round_table_sessions`, `family_portraits`, `negotiator_sessions` |
+| 7 | Эффект Бабочки | `butterfly_events` | `fractal_cards`, `wonder_vaults` |
+| — | Архимедов рычаг | `chronicle_slots` | — (связующий бонус) |
+| — | Auth | `users` | — |
 
-### [2026-06-28] Build Verification
-**Action:** `npx next build`
-**Result:** ✓ Compiled successfully. 11 routes generated (/, /journal, /emotional, /shadow, /sensory, /butterfly, /reframing, /self, /_not-found, /api/hello)
-**Note:** Все страницы статические (Static), кроме /api/hello
+**Особенности:**
+- User хранит telegram_id и vk_user_id (оба unique)
+- Модели используют DateTime(timezone=True) с _utcnow() default
+- Все хардкодят user_id=1 — авторизация не подключена к роутам
+- JSON-поля хранятся как str с типом JSON в SA (корректно для asyncpg)
 
-### [2026-06-28] E2E Verification
-**Action:** Tested all pages through Docker
-**Result:** All 8 pages return 200 from http://localhost:3000
-- Backend API отвечает: journal entries=1, emotional checkins=1, butterfly events=1
-- POST/PUT/GET цикл работает через query-параметры
-- Foreign key ошибка исправлена (создан default user id=1 в БД)
+### 2.3 Роуты (60+ эндпоинтов)
 
-### [2026-06-28] Infrastructure Check
-**Docker containers:** All 4 running (shturman-db healthy, shturman-redis healthy, shturman-backend Up 2h, shturman-frontend Up 32m)
-**Health checks:** /health OK, /api/health OK, /api/health/db OK (database connected)
-**API docs:** Swagger UI at /api/docs returns 200
+| Префикс | Файл роута | Методы |
+|---------|------------|--------|
+| `/health` | `health.py` | GET /health, GET /health/db |
+| `/auth` | `auth.py` | POST /posts, GET /posts, GET /posts/stats, POST /round-table, POST /family-portrait, POST /negotiator, GET /round-table, GET /family-portrait |
+| `/auth` | `vk_auth.py` | GET /auth/vk-oauth, POST /auth/vk |
+| `/journal` | `journal.py` | GET /entries, POST /entries, GET /entries/{id}, POST /patterns/generate, POST /alt-reality, GET /patterns, GET /alt-reality |
+| `/emotional` | `emotional.py` | POST /checkins, GET /checkins, GET /checkins/streak, POST /biorhythm, GET /biorhythm, POST /resources, GET /resources, POST /avatar, GET /avatar |
+| `/reframing` | `courses.py` | POST /sessions, POST /insight-box, POST /blind-spot, POST /ai-advocate, GET /sessions, GET /insight-box |
+| `/shadow` | `community.py` | POST /recordings, GET /recordings, POST /mirror-letter, POST /forbidden-desire, POST /anti-hero, GET /mirror-letters, GET /anti-hero |
+| `/sensory` | `shturman_chat.py` | POST /checkins, GET /checkins, GET /kinetic-data, POST /anchor/save, GET /anchor/play, GET /predict |
+| `/butterfly` | `bonuses.py` | POST /events, GET /events, GET /events/count, POST /fractal, POST /vault, GET /fractal, GET /vault |
 
-## Known Issues (Resolved & Open)
-1. ✅ [RESOLVED] Tables not created on startup — fixed with explicit model import in main.py
-2. ⚠️ Prompt file paths use relative `app/prompts/...` — will break if run from wrong directory
-3. ℹ️ No virtual environment — deps installed globally (pip3)
-4. ℹ️ auth.py prefix /auth but serves subpersonality/round-table content (naming mismatch)
-5. ℹ️ All endpoints hardcoded user_id=1 — no real auth
-6. ℹ️ `get_db()` does `await session.close()` after yield (may be redundant with async context manager)
+### 2.4 Аутентификация
 
-## Docker / Infrastructure
-- docker-compose.yml has postgres:16, redis:7, backend, frontend
-- DB: postgresql+asyncpg://shturman:shturman_secret@postgres:5432/shturman
-- Redis: redis://redis:6379/0
-- Backend on :8000, Frontend on :3000
+- **VK Mini App**: POST /auth/vk — HMAC-SHA256 верификация подписи
+- **VK OAuth (веб)**: GET /auth/vk-oauth — стандартный OAuth 2.0 code flow
+- **JWT**: HS256, 24h expiry
+- **Проблема**: get_current_user() не используется ни в одном роуте — все user_id=1
 
-### [2026-06-28] Страницы дисклеймера и философии
-**Action:** Созданы 2 страницы Next.js App Router
-**Файлы:**
-- `apps/frontend/src/app/disclaimer/page.tsx` — дисклеймер, политика конфиденциальности, контакты экстренной помощи (МЧС, 112, телефон доверия)
-- `apps/frontend/src/app/philosophy/page.tsx` — философия проекта, 7 методик с научными авторами, как пользоваться, что даёт
-- `vk-mini-app-description.md` — описание для VK
-- `vk-mini-app-preview.txt` — текст превью-карточки
-- `vk-mini-app-privacy.txt` — политика конфиденциальности для VK
+### 2.5 AI-генерация
 
-### [2026-06-28] Иконки VK Mini App
-**Action:** Сгенерированы иконки через Pillow (тёмный фон + золотой компас)
-**Файлы в `assets/vk-icons/`:**
-- `icon_universal_576.png` — универсальная иконка (576×576, 12 KB)
-- `icon_catalog_278.png` — иконка каталога (278×278, 5.3 KB)
-- `icon_small_150.png` — маленькая иконка (150×150, 2.8 KB)
-- `favicon_32.png` — фавикон (32×32, 579 B)
-- `snippet_big_1120x630.png` — большой сниппет (1120×630, 32 KB)
-- `splash_1080x1920.png` — экран запуска (1080×1920, 49 KB)
+- Все AI-эндпоинты читают system-промпты из `backend/app/prompts/*.md`
+- Используют AsyncOpenAI -> DeepSeek Chat
+- Температура: 0.7-0.8, max_tokens: 800-1500
 
-### [2026-06-28] GitHub репозиторий
-**Action:** Создан публичный репозиторий Odinberg/shturman
-**URL:** https://github.com/Odinberg/shturman
-**Ветка:** main (force push из-за workflow scope)
-**Удалены:** .github/workflows/ci.yml из истории
+---
 
-### [2026-06-28] Домен и деплой
-**Action:** Настроен продакшн-стек для vnutrenniy-kompas.ru
-**Файлы:**
-- `docker-compose.prod.yml` — production compose с отдельными volume/networks
-- `nginx/nginx.conf` — reverse proxy (80 → frontend:3000, /api → backend:8000)
-- `apps/frontend/Dockerfile.prod` — production Dockerfile (multi-stage)
-- `deploy.sh` — скрипт деплоя с health-чеками
-- `backend/app/core/config.py` — добавлен DOMAIN, VK_APP_ID/VK_APP_SECRET
-**DNS:** vnutrenniy-kompas.ru → 91.247.233.83
+## 3. Фронтенд: Next.js 16 + React 19
 
-### [2026-06-28] Системная интеграция Synology
-**Action:** Деплой на Synology NAS (192.168.0.72)
-**Проблемы:**
-- DSM nginx на 80/443 → пришлось менять конфиг
-- Docker без сокета в PATH → alias к /volume1/@appstore/ContainerManager/usr/bin/docker
-- Let's Encrypt через DNS challenge (порт 80 занят DSM)
-- `docker compose` без TTY → `CI=true` в Dockerfile
-**Решение:** DSM Reverse Proxy: 443 → localhost:9090 (shturman-frontend)
-**Статус:** Все 5 контейнеров работают, ментор остался на :8080
-**URL:** https://vnutrenniy-kompas.ru (Штурман), http://192.168.0.72:8080 (ментор)
+### 3.1 Структура App Router
 
-### [2026-06-28] VK ID Аутентификация
-**Action:** Реализован вход через VK ID
-**Бэкенд:**
-- `backend/app/services/vk_auth.py` — HMAC-SHA256 верификация VK подписи
-- `backend/app/api/routes/vk_auth.py` — POST /api/auth/vk, создаёт/ищет пользователя, возвращает JWT
-- `backend/app/core/database.py` — get_current_user dependency (JWT → VK params → dev fallback)
-**Фронтенд:**
-- `apps/frontend/src/lib/vk-auth.ts` — useVkAuth() хук (авто-извлечение VK params из URL)
-- `apps/frontend/src/lib/api.ts` — authAPI.vkLogin(), токен в Authorization header
-- `apps/frontend/src/lib/vk-bridge.tsx` — VkBridgeProvider (инициализация VK Mini App)
-**Примечание:** VK_APP_SECRET = 7d0193437d0193437d019343857e406cbb77d017d0193431740d791f1210944dd8b31aa
+```
+apps/frontend/src/app/
+├── page.tsx              # Главная (hero + dashboard + 7 направлений)
+├── layout.tsx            # RootLayout (CSS-переменные, шапка, футер, VK Bridge)
+├── global.css            # Базовые стили
+├── journal/page.tsx      # Активный дневник
+├── emotional/page.tsx    # Эмоциональный профиль
+├── reframing/page.tsx    # Рефрейминг
+├── shadow/page.tsx       # Диалог с Тенью
+├── sensory/page.tsx      # Сенсорные якоря
+├── self/page.tsx         # Множественность Я
+├── butterfly/page.tsx    # Эффект Бабочки
+├── philosophy/page.tsx   # Философия
+├── disclaimer/page.tsx   # Дисклеймер
+├── api/hello/route.ts    # Тестовый API-роут
+└── auth/                 # VK OAuth callback
+```
 
-### [2026-06-28] DeepSeek AI (вместо OpenAI)
-**Action:** Смена AI-провайдера с OpenAI на DeepSeek
-**Файлы:**
-- `backend/app/core/config.py` — new: OPENAI_API_BASE=https://api.deepseek.com, OPENAI_MODEL=deepseek-chat
-- `backend/app/core/ai.py` — хелпер get_ai_client() / get_ai_model()
-- Все route файлы — заменён AsyncOpenAI на get_ai_client()
-**API ключ:** sk-e8f4ec3c7d2341eeb94df58b03263220
+### 3.2 Lib-слой
 
+| Файл | Назначение |
+|------|------------|
+| `lib/api.ts` | Единый API-клиент, JWT в Authorization header, 7 API-объектов |
+| `lib/vk-auth.ts` | useVkAuth() хук: парсинг VK-параметров, вызов /auth/vk |
+| `lib/vk-bridge.tsx` | VkBridgeProvider: @vkontakte/vk-bridge инициализация |
+| `lib/auth-gate.tsx` | AuthGate: проверка токена, экран входа через VK ID |
+
+### 3.3 Дизайн
+- Тёмная тема (#0A0A0A bg, #C9A96E gold)
+- Inter (основной) + Cormorant Garamond (заголовки)
+- CSS-in-JS через <style>-блоки
+- IntersectionObserver для анимаций
+
+---
+
+## 4. AI-промпты (22 файла)
+
+| Файл | Назначение |
+|------|------------|
+| `shturman_personality.md` | Базовая личность Штурмана (морская метафора) |
+| `onboarding.md` | Онбординг — 5 вопросов -> рекомендация курса |
+| `pattern_map.md` | Карта сценариев из дневника |
+| `alt_reality.md` | Переписывание записи в жанре (хоббит, детектив...) |
+| `biorhythm.md` | Биоритмолог по чекинам |
+| `emotional_avatar.md` | Аватар недели + DALL-E промпт |
+| `resource_states.md` | Коллекция ресурсных состояний |
+| `insight_box.md` | Шкатулка формулировок |
+| `blind_spot.md` | 2 вопроса для смены фокуса |
+| `ai_advocate.md` | ИИ-адвокат (5 аргументов) |
+| `mirror_double.md` | Зеркальный дублёр |
+| `forbidden_desires.md` | Карта запретных желаний |
+| `anti_hero.md` | Комикс анти-героя + DALL-E |
+| `round_table.md` | Круглый стол субличностей |
+| `family_portrait.md` | Портрет семьи + DALL-E |
+| `negotiator.md` | Переговорщик vs Критик |
+| `fractal_day.md` | Фрактал дня |
+| `wonder_vault.md` | Копилка чудес |
+| `metaphor_of_day.md` | Метафора дня + DALL-E |
+| `sensory_anchors_spec.md` | Спецификация (техническая) |
+| `archimedean_lever.md` | Режим Хроник (спецификация 3D-куба) |
+| `quiet_bay_moderation.md` | Модерация сообщества |
+
+---
+
+## 5. Инфраструктура
+
+### 5.1 Docker
+- 4 сервиса: postgres:16-alpine, redis:7-alpine, backend (Python 3.12-slim), frontend (Node 22-alpine)
+- Prod: отдельная сеть shturman_net, nginx reverse proxy
+
+### 5.2 Деплой (deploy.sh)
+- Synology NAS (192.168.0.72), публичный IP 91.247.233.83
+- docker compose -f docker-compose.prod.yml build --no-cache && up -d
+- Healthcheck: PostgreSQL, Redis, Backend, Frontend
+
+### 5.3 Nx монорепа
+- Nx 23.0.1, plugins: @nx/js, @nx/next, @nx/playwright
+- pnpm workspace в packages/*, apps/*
+- TypeScript 6.0, SWC-компилятор
+
+---
+
+## 6. Ключевые проблемы
+
+1. **Auth disabled in practice** — get_current_user никогда не вызывается. Все user_id=1
+2. **POST-параметры как Query, не Body** — не масштабируется, не документируется в OpenAPI
+3. **Нейминг** — Н6 в auth.py, Н5 в shturman_chat.py
+4. **Timezone** — _utcnow() корректна, но некоторые места без timezone
+5. **Нет Alembic** — create_all() на старте, даже в прод-сборке
+6. **Нет тестов** — ни одного в проекте
+7. **5 из 7 страниц направлений** — только скелеты page.tsx
+8. **3D-куб Архимедова рычага** — описан, но не реализован
+9. **DeepSeek API key** — может не подходить ключ от OpenAI (префиксы разные)
+
+---
+
+## 7. Сводка
+
+```
+Файлов:        ~150
+Бэкенд:        Python 3.12 + FastAPI 0.119 + SQLAlchemy 2.0 + asyncpg
+Фронтенд:      Next.js 16 (Turbopack) + React 19
+AI:            DeepSeek Chat (через OpenAI SDK)
+Базы:          PostgreSQL 16 + Redis 7
+Моделей БД:    26 таблиц
+Эндпоинтов:    60+
+AI-промптов:   22 .md-файла
+Docker:        4 сервиса (postgres, redis, backend, frontend)
+Деплой:        Synology NAS, nginx reverse proxy
+VK:            Mini App (app54657016) + Web (app54657524)
+Стек:          Nx 23, pnpm, TypeScript 6, SWC
+```

@@ -66,8 +66,12 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    # Монтируем только src, public и конфиги — node_modules остаётся из образа
     volumes:
-      - ./apps/frontend:/app/apps/frontend
+      - ./apps/frontend/src:/app/apps/frontend/src
+      - ./apps/frontend/public:/app/apps/frontend/public
+      - ./apps/frontend/next.config.js:/app/apps/frontend/next.config.js
+      - ./apps/frontend/package.json:/app/apps/frontend/package.json
       - ./packages:/app/packages
       - ./nx.json:/app/nx.json
       - ./tsconfig.base.json:/app/tsconfig.base.json

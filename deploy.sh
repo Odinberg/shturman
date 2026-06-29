@@ -11,11 +11,15 @@ set -e
 echo "🚀 Деплой Штурман на Synology"
 
 # --- Проверка окружения ---
+if [ -f ".env.prod" ]; then
+    echo "📄 Загружаю .env.prod..."
+    set -a
+    source .env.prod
+    set +a
+fi
+
 if [ -z "$OPENAI_API_KEY" ]; then
-    echo "❌ OPENAI_API_KEY не задан. Создайте .env.prod:"
-    echo "   OPENAI_API_KEY=sk-..."
-    echo "   JWT_SECRET=<случайная строка>"
-    echo "   DB_PASSWORD=<пароль БД>"
+    echo "❌ OPENAI_API_KEY не задан"
     exit 1
 fi
 
@@ -23,6 +27,18 @@ if [ -z "$JWT_SECRET" ]; then
     echo "❌ JWT_SECRET не задан"
     exit 1
 fi
+
+if [ -z "$DB_PASSWORD" ]; then
+    echo "❌ DB_PASSWORD не задан"
+    exit 1
+fi
+
+if [ -z "$VK_APP_SECRET" ] || [ -z "$VK_WEB_CLIENT_SECRET" ]; then
+    echo "❌ VK_APP_SECRET или VK_WEB_CLIENT_SECRET не заданы"
+    exit 1
+fi
+
+echo "  ✅ Все секреты на месте"
 
 # --- Сборка ---
 echo ""
