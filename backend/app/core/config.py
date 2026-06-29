@@ -26,9 +26,10 @@ class Settings(BaseSettings):
     OPENAI_API_BASE: str = "https://api.deepseek.com"
     OPENAI_MODEL: str = "deepseek-chat"
 
-    # VK Mini App
+    # VK Mini App & OAuth
     VK_APP_ID: str = "54657016"
     VK_APP_SECRET: str = ""
+    VK_SERVICE_TOKEN: str = ""
 
     # Domain
     DOMAIN: str = "vnutrenniy-kompas.ru"

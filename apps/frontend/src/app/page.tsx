@@ -481,10 +481,47 @@ export default function Home() {
                     : ''}
               </p>
             )}
-            <a href="#directions" className="hero-cta">
-              Методики
-              <span>↓</span>
-            </a>
+            <div className="hero-buttons">
+              <a href="#directions" className="hero-cta">
+                Методики
+                <span>↓</span>
+              </a>
+              <a
+                href="https://id.vk.com/oauth2/auth?client_id=54657016&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback&response_type=code&scope=vkid.person_email"
+                className="hero-cta-vk"
+              >
+                Войти через VK ID
+              </a>
+            </div>
+            <style>{`
+              .hero-buttons {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 1rem;
+                flex-wrap: wrap;
+              }
+              .hero-cta-vk {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.75rem;
+                background: transparent;
+                color: var(--color-gold);
+                border: 1px solid var(--color-gold);
+                padding: 1rem 2.5rem;
+                border-radius: var(--border-radius);
+                text-decoration: none;
+                font-weight: 400;
+                font-size: 1rem;
+                transition: var(--transition);
+                letter-spacing: 0.02em;
+              }
+              .hero-cta-vk:hover {
+                background: var(--color-gold);
+                color: var(--color-dark);
+                transform: translateY(-2px);
+              }
+            `}</style>
           </div>
         </div>
       </section>
