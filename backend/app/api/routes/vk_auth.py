@@ -52,8 +52,8 @@ async def vk_oauth_callback(
     token_url = "https://oauth.vk.com/access_token"
     async with httpx.AsyncClient() as client:
         resp = await client.get(token_url, params={
-            "client_id": settings.VK_APP_ID,
-            "client_secret": settings.VK_APP_SECRET,
+            "client_id": settings.VK_WEB_APP_ID,
+            "client_secret": settings.VK_WEB_CLIENT_SECRET,
             "redirect_uri": f"https://{settings.DOMAIN}/auth/callback",
             "code": code,
         })

@@ -5,7 +5,7 @@ import { getAuthToken } from './api';
 
 const VK_OAUTH_URL =
   'https://oauth.vk.com/authorize' +
-  '?client_id=54657016' +
+  '?client_id=54657524' +
   '&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback' +
   '&response_type=code' +
   '&v=5.199';
