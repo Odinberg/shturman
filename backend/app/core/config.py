@@ -21,9 +21,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
-    # OpenAI
+    # AI Provider (OpenAI-compatible: OpenAI, DeepSeek, etc.)
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_API_BASE: str = "https://api.deepseek.com"
+    OPENAI_MODEL: str = "deepseek-chat"
 
     # VK Mini App
     VK_APP_ID: str = "54657016"
