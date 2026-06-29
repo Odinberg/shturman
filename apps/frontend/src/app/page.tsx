@@ -487,7 +487,7 @@ export default function Home() {
                 <span>↓</span>
               </a>
               <a
-                href="https://id.vk.com/oauth2/auth?client_id=54657016&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback&response_type=code&scope=vkid.person_email"
+                href="https://oauth.vk.com/authorize?client_id=54657016&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback&response_type=code&v=5.199"
                 className="hero-cta-vk"
               >
                 Войти через VK ID

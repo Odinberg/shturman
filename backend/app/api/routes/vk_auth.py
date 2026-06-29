@@ -48,24 +48,21 @@ async def vk_oauth_callback(
     """
     import httpx
 
-    if not settings.VK_SERVICE_TOKEN:
-        raise HTTPException(status_code=500, detail="VK_SERVICE_TOKEN не настроен")
-
-    # Шаг 1: обмениваем code на access_token
-    token_url = "https://api.vk.com/method/auth.exchangeSilentAuthToken"
+    # Шаг 1: обмениваем code на access_token (стандартный OAuth 2.0)
+    token_url = "https://oauth.vk.com/access_token"
     async with httpx.AsyncClient() as client:
         resp = await client.get(token_url, params={
-            "v": "5.199",
-            "token": settings.VK_SERVICE_TOKEN,
-            "access_token": code,
-            "uuid": f"{settings.VK_APP_ID}",  # vk_app_id
+            "client_id": settings.VK_APP_ID,
+            "client_secret": settings.VK_APP_SECRET,
+            "redirect_uri": f"https://{settings.DOMAIN}/auth/callback",
+            "code": code,
         })
 
     token_data = resp.json()
     if "error" in token_data:
-        raise HTTPException(status_code=400, detail=f"VK API error: {token_data['error'].get('error_msg', 'unknown')}")
+        raise HTTPException(status_code=400, detail=f"VK OAuth error: {token_data.get('error_description', token_data['error'])}")
 
-    vk_user_id = str(token_data.get("response", {}).get("user_id", ""))
+    vk_user_id = str(token_data.get("user_id", ""))
 
     if not vk_user_id:
         raise HTTPException(status_code=400, detail="Не удалось получить vk_user_id")

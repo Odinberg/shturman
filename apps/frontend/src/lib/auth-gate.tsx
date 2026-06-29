@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { getAuthToken } from './api';
 
 const VK_OAUTH_URL =
-  'https://id.vk.com/oauth2/auth' +
+  'https://oauth.vk.com/authorize' +
   '?client_id=54657016' +
   '&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback' +
   '&response_type=code' +
-  '&scope=vkid.person_email,phone';
+  '&v=5.199';
 
 interface AuthGateProps {
   children: React.ReactNode;
