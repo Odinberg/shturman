@@ -5,43 +5,43 @@ Butterfly events, fractal cards, wonder vaults.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.post("/events")
-async def create_butterfly_event(event_text: str, db: AsyncSession = Depends(get_db)):
+async def create_butterfly_event(event_text: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ButterflyEvent
-    ev = ButterflyEvent(user_id=1, event_text=event_text)
+    ev = ButterflyEvent(user_id, event_text=event_text)
     db.add(ev)
     await db.flush()
     return {"id": ev.id, "status": "logged"}
 
 
 @router.get("/events")
-async def list_events(db: AsyncSession = Depends(get_db)):
+async def list_events(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ButterflyEvent
     from sqlalchemy import select
     result = await db.execute(
-        select(ButterflyEvent).where(ButterflyEvent.user_id == 1).order_by(ButterflyEvent.event_date.desc()).limit(100)
+        select(ButterflyEvent).where(ButterflyEvent.user_id == user_id).order_by(ButterflyEvent.event_date.desc()).limit(100)
     )
     return [{"id": e.id, "event": e.event_text, "date": str(e.event_date)} for e in result.scalars().all()]
 
 
 @router.get("/events/count")
-async def event_stats(db: AsyncSession = Depends(get_db)):
+async def event_stats(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ButterflyEvent
     from sqlalchemy import select, func, cast, Date
     result = await db.execute(
-        select(func.count(ButterflyEvent.id)).where(ButterflyEvent.user_id == 1)
+        select(func.count(ButterflyEvent.id)).where(ButterflyEvent.user_id == user_id)
     )
     total = result.scalar()
     return {"total_events": total, "bonus_unlocked": total >= 7}
 
 
 @router.post("/fractal")
-async def generate_fractal(event_id: int, db: AsyncSession = Depends(get_db)):
+async def generate_fractal(event_id: int, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Фрактал дня (бонус Н7)."""
     from app.models.models import ButterflyEvent, FractalCard
     from openai import AsyncOpenAI
@@ -66,14 +66,14 @@ async def generate_fractal(event_id: int, db: AsyncSession = Depends(get_db)):
     )
 
     insight = response.choices[0].message.content
-    fc = FractalCard(user_id=1, event_id=event_id, association_chain={"raw": insight}, insight_text=insight)
+    fc = FractalCard(user_id, event_id=event_id, association_chain={"raw": insight}, insight_text=insight)
     db.add(fc)
     await db.flush()
     return {"id": fc.id, "insight": insight}
 
 
 @router.post("/vault")
-async def generate_wonder_vault(db: AsyncSession = Depends(get_db)):
+async def generate_wonder_vault(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Копилка чудес (бонус Н7)."""
     from app.models.models import ButterflyEvent, WonderVault
     from sqlalchemy import select
@@ -81,7 +81,7 @@ async def generate_wonder_vault(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(ButterflyEvent).where(ButterflyEvent.user_id == 1).order_by(ButterflyEvent.event_date.asc()).limit(100)
+        select(ButterflyEvent).where(ButterflyEvent.user_id == user_id).order_by(ButterflyEvent.event_date.asc()).limit(100)
     )
     events = result.scalars().all()
     if len(events) < 7:
@@ -107,27 +107,27 @@ async def generate_wonder_vault(db: AsyncSession = Depends(get_db)):
 
     from datetime import datetime
     month = datetime.now().strftime("%Y-%m")
-    wv = WonderVault(user_id=1, month=month, slideshow_text=vault_text)
+    wv = WonderVault(user_id, month=month, slideshow_text=vault_text)
     db.add(wv)
     await db.flush()
     return {"id": wv.id, "vault": vault_text}
 
 
 @router.get("/fractal")
-async def list_fractals(db: AsyncSession = Depends(get_db)):
+async def list_fractals(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import FractalCard
     from sqlalchemy import select
     result = await db.execute(
-        select(FractalCard).where(FractalCard.user_id == 1).order_by(FractalCard.created_at.desc()).limit(20)
+        select(FractalCard).where(FractalCard.user_id == user_id).order_by(FractalCard.created_at.desc()).limit(20)
     )
     return [{"id": fc.id, "event_id": fc.event_id, "created_at": fc.created_at.isoformat()} for fc in result.scalars().all()]
 
 
 @router.get("/vault")
-async def list_vaults(db: AsyncSession = Depends(get_db)):
+async def list_vaults(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import WonderVault
     from sqlalchemy import select
     result = await db.execute(
-        select(WonderVault).where(WonderVault.user_id == 1).order_by(WonderVault.created_at.desc()).limit(10)
+        select(WonderVault).where(WonderVault.user_id == user_id).order_by(WonderVault.created_at.desc()).limit(10)
     )
     return [{"id": wv.id, "month": wv.month, "has_parable": bool(wv.parable_text)} for wv in result.scalars().all()]

@@ -2,6 +2,7 @@
 Database engine and session configuration.
 """
 
+from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
@@ -40,8 +41,8 @@ async def get_db() -> AsyncSession:
 
 
 async def get_current_user(
-    request: __import__("fastapi").Request,
-    db: AsyncSession = __import__("fastapi").Depends(get_db),
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> int:
     """
     Dependency: возвращает user_id из JWT токена или 1 (dev-режим).

@@ -54,3 +54,9 @@ Thumbs.db
 out
 
 test-output
+
+# Environment files (secrets)
+.env
+.env.prod
+.env.local
+.env.*.local

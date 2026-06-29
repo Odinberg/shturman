@@ -6,40 +6,42 @@ Journal entries, pattern maps, alt reality.
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.get("/entries")
-async def list_entries(db: AsyncSession = Depends(get_db)):
+async def list_entries(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import JournalEntry
     from sqlalchemy import select
-    result = await db.execute(select(JournalEntry).order_by(JournalEntry.created_at.desc()).limit(50))
+    result = await db.execute(
+        select(JournalEntry).where(JournalEntry.user_id == user_id).order_by(JournalEntry.created_at.desc()).limit(50)
+    )
     entries = result.scalars().all()
     return [{"id": e.id, "content": e.content[:200], "mood": e.mood, "created_at": e.created_at.isoformat()} for e in entries]
 
 
 @router.post("/entries")
-async def create_entry(content: str, mood: str = None, db: AsyncSession = Depends(get_db)):
+async def create_entry(content: str, mood: str = None, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import JournalEntry
-    entry = JournalEntry(user_id=1, content=content, mood=mood)
+    entry = JournalEntry(user_id, content=content, mood=mood)
     db.add(entry)
     await db.flush()
     return {"id": entry.id, "status": "created"}
 
 
 @router.get("/entries/{entry_id}")
-async def get_entry(entry_id: int, db: AsyncSession = Depends(get_db)):
+async def get_entry(entry_id: int, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import JournalEntry
     result = await db.get(JournalEntry, entry_id)
-    if not result:
+    if not result or result.user_id != user_id:
         return {"error": "not found"}, 404
     return {"id": result.id, "content": result.content, "mood": result.mood, "created_at": result.created_at.isoformat()}
 
 
 @router.post("/patterns/generate")
-async def generate_pattern_map(db: AsyncSession = Depends(get_db)):
+async def generate_pattern_map(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Генерация карты повторяющихся сценариев (бонус Н1)."""
     from app.models.models import JournalEntry, PatternMap
     from sqlalchemy import select
@@ -49,7 +51,7 @@ async def generate_pattern_map(db: AsyncSession = Depends(get_db)):
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=21)
     result = await db.execute(
-        select(JournalEntry).where(JournalEntry.user_id == 1, JournalEntry.created_at >= cutoff)
+        select(JournalEntry).where(JournalEntry.user_id == user_id, JournalEntry.created_at >= cutoff)
         .order_by(JournalEntry.created_at.asc())
     )
     entries = result.scalars().all()
@@ -79,7 +81,7 @@ async def generate_pattern_map(db: AsyncSession = Depends(get_db)):
     pattern_text = response.choices[0].message.content
 
     pm = PatternMap(
-        user_id=1,
+        user_id,
         period_start=entries[0].created_at.date(),
         period_end=entries[-1].created_at.date(),
         patterns_json={"raw": pattern_text},
@@ -91,7 +93,7 @@ async def generate_pattern_map(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/alt-reality")
-async def generate_alt_reality(entry_id: int, genre: str, db: AsyncSession = Depends(get_db)):
+async def generate_alt_reality(entry_id: int, genre: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Создать альтернативную реальность для записи (бонус Н1)."""
     from app.models.models import JournalEntry, AltRealitySession
     from openai import AsyncOpenAI
@@ -119,7 +121,7 @@ async def generate_alt_reality(entry_id: int, genre: str, db: AsyncSession = Dep
     rewritten = response.choices[0].message.content
 
     session = AltRealitySession(
-        user_id=1,
+        user_id,
         journal_entry_id=entry_id,
         genre=genre,
         original_text=entry.content,
@@ -132,16 +134,16 @@ async def generate_alt_reality(entry_id: int, genre: str, db: AsyncSession = Dep
 
 
 @router.get("/patterns")
-async def list_pattern_maps(db: AsyncSession = Depends(get_db)):
+async def list_pattern_maps(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import PatternMap
     from sqlalchemy import select
-    result = await db.execute(select(PatternMap).where(PatternMap.user_id == 1).order_by(PatternMap.created_at.desc()).limit(10))
+    result = await db.execute(select(PatternMap).where(PatternMap.user_id == user_id).order_by(PatternMap.created_at.desc()).limit(10))
     return [{"id": pm.id, "period": f"{pm.period_start} - {pm.period_end}", "created_at": pm.created_at.isoformat()} for pm in result.scalars().all()]
 
 
 @router.get("/alt-reality")
-async def list_alt_reality_sessions(db: AsyncSession = Depends(get_db)):
+async def list_alt_reality_sessions(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import AltRealitySession
     from sqlalchemy import select
-    result = await db.execute(select(AltRealitySession).where(AltRealitySession.user_id == 1).order_by(AltRealitySession.created_at.desc()).limit(10))
+    result = await db.execute(select(AltRealitySession).where(AltRealitySession.user_id == user_id).order_by(AltRealitySession.created_at.desc()).limit(10))
     return [{"id": s.id, "genre": s.genre, "created_at": s.created_at.isoformat()} for s in result.scalars().all()]

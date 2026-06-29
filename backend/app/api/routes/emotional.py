@@ -6,26 +6,26 @@ Checkins, biorhythm, resource states, avatar.
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.post("/checkins")
-async def create_checkin(emoji: str, event_text: str = "", db: AsyncSession = Depends(get_db)):
+async def create_checkin(emoji: str, event_text: str = "", db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import EmotionalCheckin
-    checkin = EmotionalCheckin(user_id=1, emoji=emoji, event_words=event_text)
+    checkin = EmotionalCheckin(user_id, emoji=emoji, event_words=event_text)
     db.add(checkin)
     await db.flush()
     return {"id": checkin.id, "status": "logged"}
 
 
 @router.get("/checkins")
-async def list_checkins(db: AsyncSession = Depends(get_db)):
+async def list_checkins(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import EmotionalCheckin
     from sqlalchemy import select
     result = await db.execute(
-        select(EmotionalCheckin).where(EmotionalCheckin.user_id == 1)
+        select(EmotionalCheckin).where(EmotionalCheckin.user_id == user_id)
         .order_by(EmotionalCheckin.checkin_time.desc()).limit(100)
     )
     return [
@@ -35,12 +35,12 @@ async def list_checkins(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/checkins/streak")
-async def checkin_streak(db: AsyncSession = Depends(get_db)):
+async def checkin_streak(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import EmotionalCheckin
     from sqlalchemy import select, func, cast, Date
     result = await db.execute(
         select(cast(EmotionalCheckin.checkin_time, Date), func.count(EmotionalCheckin.id))
-        .where(EmotionalCheckin.user_id == 1)
+        .where(EmotionalCheckin.user_id == user_id)
         .group_by(cast(EmotionalCheckin.checkin_time, Date))
         .order_by(cast(EmotionalCheckin.checkin_time, Date).desc()).limit(30)
     )
@@ -50,7 +50,7 @@ async def checkin_streak(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/biorhythm")
-async def generate_biorhythm(db: AsyncSession = Depends(get_db)):
+async def generate_biorhythm(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Генерировать отчёт биоритмолога (бонус Н2)."""
     from app.models.models import EmotionalCheckin, BiorhythmReport
     from sqlalchemy import select
@@ -60,7 +60,7 @@ async def generate_biorhythm(db: AsyncSession = Depends(get_db)):
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     result = await db.execute(
-        select(EmotionalCheckin).where(EmotionalCheckin.user_id == 1, EmotionalCheckin.checkin_time >= cutoff)
+        select(EmotionalCheckin).where(EmotionalCheckin.user_id == user_id, EmotionalCheckin.checkin_time >= cutoff)
         .order_by(EmotionalCheckin.checkin_time.asc())
     )
     checkins = result.scalars().all()
@@ -89,7 +89,7 @@ async def generate_biorhythm(db: AsyncSession = Depends(get_db)):
 
     report_text = response.choices[0].message.content
 
-    report = BiorhythmReport(user_id=1, period_days=len(checkins), report_text=report_text)
+    report = BiorhythmReport(user_id, period_days=len(checkins), report_text=report_text)
     db.add(report)
     await db.flush()
 
@@ -97,17 +97,17 @@ async def generate_biorhythm(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/biorhythm")
-async def list_biorhythm_reports(db: AsyncSession = Depends(get_db)):
+async def list_biorhythm_reports(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import BiorhythmReport
     from sqlalchemy import select
     result = await db.execute(
-        select(BiorhythmReport).where(BiorhythmReport.user_id == 1).order_by(BiorhythmReport.created_at.desc()).limit(10)
+        select(BiorhythmReport).where(BiorhythmReport.user_id == user_id).order_by(BiorhythmReport.created_at.desc()).limit(10)
     )
     return [{"id": r.id, "period_days": r.period_days, "created_at": r.created_at.isoformat()} for r in result.scalars().all()]
 
 
 @router.post("/resources")
-async def generate_resource_collection(db: AsyncSession = Depends(get_db)):
+async def generate_resource_collection(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Генерировать коллекцию ресурсных состояний (бонус Н2)."""
     from app.models.models import JournalEntry, EmotionalCheckin, ResourceCollection
     from sqlalchemy import select
@@ -115,7 +115,7 @@ async def generate_resource_collection(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(JournalEntry).where(JournalEntry.user_id == 1).order_by(JournalEntry.created_at.desc()).limit(50)
+        select(JournalEntry).where(JournalEntry.user_id == user_id).order_by(JournalEntry.created_at.desc()).limit(50)
     )
     entries = result.scalars().all()
 
@@ -139,7 +139,7 @@ async def generate_resource_collection(db: AsyncSession = Depends(get_db)):
 
     from datetime import datetime
     month = datetime.now().strftime("%Y-%m")
-    rc = ResourceCollection(user_id=1, month=month, resources_json={"raw": resources})
+    rc = ResourceCollection(user_id, month=month, resources_json={"raw": resources})
     db.add(rc)
     await db.flush()
 
@@ -147,17 +147,17 @@ async def generate_resource_collection(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/resources")
-async def list_resource_collections(db: AsyncSession = Depends(get_db)):
+async def list_resource_collections(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ResourceCollection
     from sqlalchemy import select
     result = await db.execute(
-        select(ResourceCollection).where(ResourceCollection.user_id == 1).order_by(ResourceCollection.created_at.desc()).limit(10)
+        select(ResourceCollection).where(ResourceCollection.user_id == user_id).order_by(ResourceCollection.created_at.desc()).limit(10)
     )
     return [{"id": rc.id, "month": rc.month, "created_at": rc.created_at.isoformat()} for rc in result.scalars().all()]
 
 
 @router.post("/avatar")
-async def generate_avatar(db: AsyncSession = Depends(get_db)):
+async def generate_avatar(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Генерировать эмоциональный аватар недели (бонус Н2)."""
     from app.models.models import EmotionalCheckin, EmotionalAvatar
     from sqlalchemy import select
@@ -167,7 +167,7 @@ async def generate_avatar(db: AsyncSession = Depends(get_db)):
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     result = await db.execute(
-        select(EmotionalCheckin).where(EmotionalCheckin.user_id == 1, EmotionalCheckin.checkin_time >= cutoff)
+        select(EmotionalCheckin).where(EmotionalCheckin.user_id == user_id, EmotionalCheckin.checkin_time >= cutoff)
         .order_by(EmotionalCheckin.checkin_time.asc())
     )
     checkins = result.scalars().all()
@@ -198,7 +198,7 @@ async def generate_avatar(db: AsyncSession = Depends(get_db)):
     dalle_prompt = dalle_match.group(1).strip() if dalle_match else ""
 
     avatar = EmotionalAvatar(
-        user_id=1,
+        user_id,
         week_start=cutoff.date(),
         avatar_text=avatar_text,
         dalle_prompt=dalle_prompt,
@@ -210,11 +210,11 @@ async def generate_avatar(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/avatar")
-async def list_avatars(db: AsyncSession = Depends(get_db)):
+async def list_avatars(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import EmotionalAvatar
     from sqlalchemy import select
     result = await db.execute(
-        select(EmotionalAvatar).where(EmotionalAvatar.user_id == 1)
+        select(EmotionalAvatar).where(EmotionalAvatar.user_id == user_id)
         .order_by(EmotionalAvatar.week_start.desc()).limit(10)
     )
     return [{"id": a.id, "week": str(a.week_start), "dalle_prompt": a.dalle_prompt, "created_at": a.created_at.isoformat()} for a in result.scalars().all()]

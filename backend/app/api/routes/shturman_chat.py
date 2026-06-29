@@ -5,35 +5,35 @@ Sensory checkins, predictions, calm anchors.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.post("/checkins")
-async def create_sensory_checkin(sensation: str, db: AsyncSession = Depends(get_db)):
+async def create_sensory_checkin(sensation: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import SensoryCheckin
     from app.models.models import SENSATION_TYPES
     if sensation not in SENSATION_TYPES:
         return {"error": f"Must be one of: {', '.join(SENSATION_TYPES)}"}
-    sc = SensoryCheckin(user_id=1, sensation=sensation)
+    sc = SensoryCheckin(user_id, sensation=sensation)
     db.add(sc)
     await db.flush()
     return {"id": sc.id, "status": "logged"}
 
 
 @router.get("/checkins")
-async def list_sensory_checkins(db: AsyncSession = Depends(get_db)):
+async def list_sensory_checkins(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
     result = await db.execute(
-        select(SensoryCheckin).where(SensoryCheckin.user_id == 1).order_by(SensoryCheckin.checkin_time.desc()).limit(100)
+        select(SensoryCheckin).where(SensoryCheckin.user_id == user_id).order_by(SensoryCheckin.checkin_time.desc()).limit(100)
     )
     return [{"id": sc.id, "sensation": sc.sensation, "time": sc.checkin_time.isoformat()} for sc in result.scalars().all()]
 
 
 @router.get("/kinetic-data")
-async def kinetic_animation_data(db: AsyncSession = Depends(get_db)):
+async def kinetic_animation_data(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Данные для кинетического дневника (бонус Н5)."""
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
@@ -41,7 +41,7 @@ async def kinetic_animation_data(db: AsyncSession = Depends(get_db)):
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     result = await db.execute(
-        select(SensoryCheckin).where(SensoryCheckin.user_id == 1, SensoryCheckin.checkin_time >= cutoff)
+        select(SensoryCheckin).where(SensoryCheckin.user_id == user_id, SensoryCheckin.checkin_time >= cutoff)
         .order_by(SensoryCheckin.checkin_time.asc())
     )
     checkins = result.scalars().all()
@@ -52,22 +52,22 @@ async def kinetic_animation_data(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/anchor/save")
-async def save_calm_anchor(db: AsyncSession = Depends(get_db)):
+async def save_calm_anchor(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Сохранить якорь спокойствия (бонус Н5)."""
     from app.models.models import CalmAnchor
     pattern = [500, 200, 500, 200, 500]
-    anchor = CalmAnchor(user_id=1, vibration_pattern=pattern, breathing_rhythm="4-7-8")
+    anchor = CalmAnchor(user_id, vibration_pattern=pattern, breathing_rhythm="4-7-8")
     db.add(anchor)
     await db.flush()
     return {"id": anchor.id, "vibration_pattern": pattern, "status": "saved"}
 
 
 @router.get("/anchor/play")
-async def play_calm_anchor(db: AsyncSession = Depends(get_db)):
+async def play_calm_anchor(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import CalmAnchor
     from sqlalchemy import select
     result = await db.execute(
-        select(CalmAnchor).where(CalmAnchor.user_id == 1).order_by(CalmAnchor.created_at.desc()).limit(1)
+        select(CalmAnchor).where(CalmAnchor.user_id == user_id).order_by(CalmAnchor.created_at.desc()).limit(1)
     )
     anchor = result.scalar_one_or_none()
     if not anchor:
@@ -76,7 +76,7 @@ async def play_calm_anchor(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/predict")
-async def predict_state(db: AsyncSession = Depends(get_db)):
+async def predict_state(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Предсказание телесного компаса."""
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
@@ -84,7 +84,7 @@ async def predict_state(db: AsyncSession = Depends(get_db)):
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     result = await db.execute(
-        select(SensoryCheckin).where(SensoryCheckin.user_id == 1, SensoryCheckin.checkin_time >= cutoff)
+        select(SensoryCheckin).where(SensoryCheckin.user_id == user_id, SensoryCheckin.checkin_time >= cutoff)
     )
     count = len(result.scalars().all())
     if count < 14:

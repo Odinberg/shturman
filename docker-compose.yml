@@ -42,6 +42,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       JWT_SECRET: ${JWT_SECRET:-shturman-jwt-secret-dev}
+      VK_APP_SECRET: ${VK_APP_SECRET:-}
+      VK_WEB_CLIENT_SECRET: ${VK_WEB_CLIENT_SECRET:-}
+      VK_SERVICE_TOKEN: ${VK_SERVICE_TOKEN:-}
       DEBUG: "true"
     ports:
       - "8000:8000"

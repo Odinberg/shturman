@@ -5,44 +5,44 @@ Subpersonality posts, round table, family portrait, negotiator.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.post("/posts")
-async def create_subpersonality_post(subpersonality: str, content: str, db: AsyncSession = Depends(get_db)):
+async def create_subpersonality_post(subpersonality: str, content: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import SubpersonalityPost
-    post = SubpersonalityPost(user_id=1, subpersonality=subpersonality, content=content)
+    post = SubpersonalityPost(user_id, subpersonality=subpersonality, content=content)
     db.add(post)
     await db.flush()
     return {"id": post.id, "status": "created"}
 
 
 @router.get("/posts")
-async def list_posts(db: AsyncSession = Depends(get_db)):
+async def list_posts(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select
     result = await db.execute(
-        select(SubpersonalityPost).where(SubpersonalityPost.user_id == 1).order_by(SubpersonalityPost.post_date.desc()).limit(50)
+        select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(50)
     )
     return [{"id": p.id, "subpersonality": p.subpersonality, "content": p.content[:200], "date": str(p.post_date)} for p in result.scalars().all()]
 
 
 @router.get("/posts/stats")
-async def subpersonality_stats(db: AsyncSession = Depends(get_db)):
+async def subpersonality_stats(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select, func
     result = await db.execute(
         select(SubpersonalityPost.subpersonality, func.count(SubpersonalityPost.id))
-        .where(SubpersonalityPost.user_id == 1)
+        .where(SubpersonalityPost.user_id == user_id)
         .group_by(SubpersonalityPost.subpersonality)
     )
     return [{"persona": r[0], "count": r[1]} for r in result.all()]
 
 
 @router.post("/round-table")
-async def generate_round_table(db: AsyncSession = Depends(get_db)):
+async def generate_round_table(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Круглый стол (бонус Н6)."""
     from app.models.models import SubpersonalityPost, RoundTableSession
     from sqlalchemy import select
@@ -50,7 +50,7 @@ async def generate_round_table(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(SubpersonalityPost).where(SubpersonalityPost.user_id == 1).order_by(SubpersonalityPost.post_date.desc()).limit(10)
+        select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
     )
     posts = result.scalars().all()
     if len(posts) < 4:
@@ -78,7 +78,7 @@ async def generate_round_table(db: AsyncSession = Depends(get_db)):
     participants = list(set(p.subpersonality for p in posts))
 
     rt = RoundTableSession(
-        user_id=1,
+        user_id,
         participants_json=participants,
         dialogue_json={"raw": dialogue},
         moderator_note="",
@@ -89,7 +89,7 @@ async def generate_round_table(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/family-portrait")
-async def generate_family_portrait(db: AsyncSession = Depends(get_db)):
+async def generate_family_portrait(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Портрет семьи (бонус Н6)."""
     from app.models.models import SubpersonalityPost, FamilyPortrait
     from sqlalchemy import select
@@ -97,7 +97,7 @@ async def generate_family_portrait(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(SubpersonalityPost).where(SubpersonalityPost.user_id == 1).order_by(SubpersonalityPost.post_date.desc()).limit(10)
+        select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
     )
     posts = result.scalars().all()
     if len(posts) < 2:
@@ -127,7 +127,7 @@ async def generate_family_portrait(db: AsyncSession = Depends(get_db)):
     dalle_prompt = dalle_match.group(1).strip() if dalle_match else ""
 
     fp = FamilyPortrait(
-        user_id=1,
+        user_id,
         characters_json={"raw": portrait},
         portrait_text=portrait,
         dalle_prompt=dalle_prompt,
@@ -138,7 +138,7 @@ async def generate_family_portrait(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/negotiator")
-async def run_negotiator(critic_quote: str, db: AsyncSession = Depends(get_db)):
+async def run_negotiator(critic_quote: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Переговорщик vs Критик (бонус Н6)."""
     from app.models.models import NegotiatorSession
     from openai import AsyncOpenAI
@@ -159,27 +159,27 @@ async def run_negotiator(critic_quote: str, db: AsyncSession = Depends(get_db)):
     )
 
     dialogue = response.choices[0].message.content
-    ns = NegotiatorSession(user_id=1, critic_quote=critic_quote, dialogue_json={"raw": dialogue})
+    ns = NegotiatorSession(user_id, critic_quote=critic_quote, dialogue_json={"raw": dialogue})
     db.add(ns)
     await db.flush()
     return {"id": ns.id, "dialogue": dialogue}
 
 
 @router.get("/round-table")
-async def list_round_tables(db: AsyncSession = Depends(get_db)):
+async def list_round_tables(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import RoundTableSession
     from sqlalchemy import select
     result = await db.execute(
-        select(RoundTableSession).where(RoundTableSession.user_id == 1).order_by(RoundTableSession.created_at.desc()).limit(10)
+        select(RoundTableSession).where(RoundTableSession.user_id == user_id).order_by(RoundTableSession.created_at.desc()).limit(10)
     )
     return [{"id": rt.id, "participants": rt.participants_json, "created_at": rt.created_at.isoformat()} for rt in result.scalars().all()]
 
 
 @router.get("/family-portrait")
-async def list_portraits(db: AsyncSession = Depends(get_db)):
+async def list_portraits(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import FamilyPortrait
     from sqlalchemy import select
     result = await db.execute(
-        select(FamilyPortrait).where(FamilyPortrait.user_id == 1).order_by(FamilyPortrait.created_at.desc()).limit(10)
+        select(FamilyPortrait).where(FamilyPortrait.user_id == user_id).order_by(FamilyPortrait.created_at.desc()).limit(10)
     )
     return [{"id": fp.id, "dalle_prompt": fp.dalle_prompt, "created_at": fp.created_at.isoformat()} for fp in result.scalars().all()]

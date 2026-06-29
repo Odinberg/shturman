@@ -5,32 +5,32 @@ Shadow recordings, mirror letters, forbidden desires, anti-hero.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.database import get_db, get_current_user
 
 router = APIRouter()
 
 
 @router.post("/recordings")
-async def create_recording(transcript: str, irritation_target: str, db: AsyncSession = Depends(get_db)):
+async def create_recording(transcript: str, irritation_target: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ShadowRecording
-    rec = ShadowRecording(user_id=1, transcript=transcript, irritation_target=irritation_target)
+    rec = ShadowRecording(user_id, transcript=transcript, irritation_target=irritation_target)
     db.add(rec)
     await db.flush()
     return {"id": rec.id, "status": "recorded"}
 
 
 @router.get("/recordings")
-async def list_recordings(db: AsyncSession = Depends(get_db)):
+async def list_recordings(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import ShadowRecording
     from sqlalchemy import select
     result = await db.execute(
-        select(ShadowRecording).where(ShadowRecording.user_id == 1).order_by(ShadowRecording.created_at.desc()).limit(20)
+        select(ShadowRecording).where(ShadowRecording.user_id == user_id).order_by(ShadowRecording.created_at.desc()).limit(20)
     )
     return [{"id": r.id, "target": r.irritation_target, "transcript": r.transcript[:200], "created_at": r.created_at.isoformat()} for r in result.scalars().all()]
 
 
 @router.post("/mirror-letter")
-async def generate_mirror_letter(recording_id: int, db: AsyncSession = Depends(get_db)):
+async def generate_mirror_letter(recording_id: int, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Зеркальный дублёр (бонус Н4)."""
     from app.models.models import ShadowRecording, MirrorLetter
     from openai import AsyncOpenAI
@@ -56,14 +56,14 @@ async def generate_mirror_letter(recording_id: int, db: AsyncSession = Depends(g
 
     letter_text = response.choices[0].message.content
 
-    ml = MirrorLetter(user_id=1, recording_id=recording_id, trait_name=rec.irritation_target, letter_text=letter_text)
+    ml = MirrorLetter(user_id, recording_id=recording_id, trait_name=rec.irritation_target, letter_text=letter_text)
     db.add(ml)
     await db.flush()
     return {"id": ml.id, "letter": letter_text}
 
 
 @router.post("/forbidden-desire")
-async def generate_forbidden_desire(db: AsyncSession = Depends(get_db)):
+async def generate_forbidden_desire(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Карта запретных желаний (бонус Н4)."""
     from app.models.models import ShadowRecording, ForbiddenDesire
     from sqlalchemy import select
@@ -71,7 +71,7 @@ async def generate_forbidden_desire(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(ShadowRecording).where(ShadowRecording.user_id == 1).order_by(ShadowRecording.created_at.desc()).limit(3)
+        select(ShadowRecording).where(ShadowRecording.user_id == user_id).order_by(ShadowRecording.created_at.desc()).limit(3)
     )
     recordings = result.scalars().all()
     if len(recordings) < 3:
@@ -98,7 +98,7 @@ async def generate_forbidden_desire(db: AsyncSession = Depends(get_db)):
 
     desire_text = response.choices[0].message.content
     fd = ForbiddenDesire(
-        user_id=1,
+        user_id,
         recording_ids=[r.id for r in recordings],
         desire_text=desire_text,
         protection_text="",
@@ -110,7 +110,7 @@ async def generate_forbidden_desire(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/anti-hero")
-async def generate_anti_hero_comic(db: AsyncSession = Depends(get_db)):
+async def generate_anti_hero_comic(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     """Анти-герой комикс (бонус Н4)."""
     from app.models.models import ForbiddenDesire, AntiHeroComic
     from sqlalchemy import select
@@ -118,7 +118,7 @@ async def generate_anti_hero_comic(db: AsyncSession = Depends(get_db)):
     from app.core.config import settings
 
     result = await db.execute(
-        select(ForbiddenDesire).where(ForbiddenDesire.user_id == 1).order_by(ForbiddenDesire.created_at.desc()).limit(1)
+        select(ForbiddenDesire).where(ForbiddenDesire.user_id == user_id).order_by(ForbiddenDesire.created_at.desc()).limit(1)
     )
     fd = result.scalar_one_or_none()
     if not fd:
@@ -144,7 +144,7 @@ async def generate_anti_hero_comic(db: AsyncSession = Depends(get_db)):
     dalle_prompt = dalle_match.group(1).strip() if dalle_match else ""
 
     ac = AntiHeroComic(
-        user_id=1, shadow_trait=fd.desire_text[:128],
+        user_id, shadow_trait=fd.desire_text[:128],
         script_json={"raw": comic_text}, dalle_prompt=dalle_prompt,
     )
     db.add(ac)
@@ -153,20 +153,20 @@ async def generate_anti_hero_comic(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/mirror-letters")
-async def list_mirror_letters(db: AsyncSession = Depends(get_db)):
+async def list_mirror_letters(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import MirrorLetter
     from sqlalchemy import select
     result = await db.execute(
-        select(MirrorLetter).where(MirrorLetter.user_id == 1).order_by(MirrorLetter.created_at.desc()).limit(10)
+        select(MirrorLetter).where(MirrorLetter.user_id == user_id).order_by(MirrorLetter.created_at.desc()).limit(10)
     )
     return [{"id": ml.id, "trait": ml.trait_name, "created_at": ml.created_at.isoformat()} for ml in result.scalars().all()]
 
 
 @router.get("/anti-hero")
-async def list_comics(db: AsyncSession = Depends(get_db)):
+async def list_comics(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
     from app.models.models import AntiHeroComic
     from sqlalchemy import select
     result = await db.execute(
-        select(AntiHeroComic).where(AntiHeroComic.user_id == 1).order_by(AntiHeroComic.created_at.desc()).limit(10)
+        select(AntiHeroComic).where(AntiHeroComic.user_id == user_id).order_by(AntiHeroComic.created_at.desc()).limit(10)
     )
     return [{"id": ac.id, "trait": ac.shadow_trait, "dalle_prompt": ac.dalle_prompt, "created_at": ac.created_at.isoformat()} for ac in result.scalars().all()]
