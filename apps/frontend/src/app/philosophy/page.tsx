@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function PhilosophyPage() {
   const methods = [
     {
@@ -81,31 +83,77 @@ export default function PhilosophyPage() {
   return (
     <>
       <style>{`
+        /* Глобальные CSS-переменные */
+        :root {
+          /* Основные цвета */
+          --color-gold: #d4af37;
+          --color-gold-light: #f0d080;
+          --color-text: #1a1a1a;
+          --color-text-secondary: #666666;
+          --color-background: #f8f6f0;
+          --color-card: #ffffff;
+          --color-border: #e8e4dc;
+          
+          /* Отступы */
+          --spacing-sm: 0.75rem;
+          --spacing-md: 2rem;
+          --spacing-lg: 4rem;
+          --spacing-xl: 6rem;
+          
+          /* Скругления */
+          --border-radius: 12px;
+          
+          /* Анимации */
+          --transition: all 0.3s ease;
+          
+          /* Шрифты */
+          --font-cormorant: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+        }
+
+        /* Темная тема (опционально) */
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --color-text: #f0ece6;
+            --color-text-secondary: #a0a0a0;
+            --color-background: #0a0a0a;
+            --color-card: #1a1a1a;
+            --color-border: #333333;
+          }
+        }
+
         .phil-nav {
           padding: var(--spacing-sm) 0;
           margin-bottom: var(--spacing-md);
         }
 
-        .phil-nav a {
+        .phil-nav-link {
           color: var(--color-gold);
           text-decoration: none;
           font-size: 0.95rem;
           transition: var(--transition);
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
         }
 
-        .phil-nav a:hover {
+        .phil-nav-link:hover {
           color: var(--color-gold-light);
+          transform: translateX(-4px);
         }
 
         .phil-page {
           max-width: 1200px;
           margin: 0 auto;
           padding: var(--spacing-md) var(--spacing-md) var(--spacing-xl);
+          background: var(--color-background);
+          min-height: 100vh;
+          color: var(--color-text);
         }
 
         .phil-hero {
           text-align: center;
           margin-bottom: var(--spacing-lg);
+          padding: var(--spacing-md) 0;
         }
 
         .phil-title {
@@ -114,6 +162,7 @@ export default function PhilosophyPage() {
           color: var(--color-gold);
           font-weight: 500;
           margin-bottom: 1rem;
+          letter-spacing: 0.02em;
         }
 
         .phil-subtitle {
@@ -145,7 +194,7 @@ export default function PhilosophyPage() {
           bottom: -8px;
           left: 0;
           width: 60px;
-          height: 1px;
+          height: 2px;
           background: var(--color-gold);
           opacity: 0.5;
         }
@@ -160,7 +209,7 @@ export default function PhilosophyPage() {
 
         .phil-text strong {
           font-weight: 500;
-          color: var(--color-gold-light);
+          color: var(--color-gold);
         }
 
         .phil-methods-grid {
@@ -179,16 +228,18 @@ export default function PhilosophyPage() {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
+          cursor: default;
         }
 
         .phil-method-card:hover {
           border-color: var(--color-gold);
           transform: translateY(-3px);
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+          box-shadow: 0 8px 24px rgba(212, 175, 55, 0.15);
         }
 
         .phil-method-icon {
           font-size: 1.75rem;
+          line-height: 1;
         }
 
         .phil-method-name {
@@ -196,6 +247,7 @@ export default function PhilosophyPage() {
           font-size: 1.3rem;
           color: var(--color-gold);
           font-weight: 500;
+          margin: 0;
         }
 
         .phil-method-subtitle {
@@ -211,6 +263,7 @@ export default function PhilosophyPage() {
           font-size: 0.95rem;
           color: var(--color-text);
           line-height: 1.7;
+          margin: 0.25rem 0;
         }
 
         .phil-method-authors {
@@ -219,7 +272,7 @@ export default function PhilosophyPage() {
           font-style: italic;
           margin-top: auto;
           padding-top: 0.5rem;
-          border-top: 1px solid rgba(112, 112, 112, 0.2);
+          border-top: 1px solid var(--color-border);
         }
 
         .phil-list {
@@ -246,6 +299,7 @@ export default function PhilosophyPage() {
 
         .phil-list li:hover {
           border-color: var(--color-gold);
+          transform: translateX(4px);
         }
 
         .phil-list-marker {
@@ -253,28 +307,101 @@ export default function PhilosophyPage() {
           flex-shrink: 0;
           font-size: 1.1rem;
           margin-top: 0.1rem;
+          font-weight: 500;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 1024px) {
+          .phil-methods-grid {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          }
         }
 
         @media (max-width: 768px) {
+          .phil-page {
+            padding: var(--spacing-sm);
+          }
+          
           .phil-title {
             font-size: 2.4rem;
           }
+          
           .phil-section-title {
             font-size: 1.6rem;
           }
+          
           .phil-methods-grid {
             grid-template-columns: 1fr;
+            gap: 1rem;
           }
+          
+          .phil-text {
+            font-size: 1rem;
+          }
+          
+          .phil-list li {
+            font-size: 0.95rem;
+            padding: 0.85rem 1rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .phil-title {
+            font-size: 2rem;
+          }
+          
+          .phil-hero {
+            margin-bottom: var(--spacing-md);
+          }
+          
+          .phil-section {
+            margin-bottom: var(--spacing-md);
+          }
+        }
+
+        /* Анимация появления для карточек */
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .phil-method-card {
+          animation: fadeInUp 0.6s ease forwards;
+          opacity: 0;
+        }
+
+        .phil-method-card:nth-child(1) { animation-delay: 0.05s; }
+        .phil-method-card:nth-child(2) { animation-delay: 0.10s; }
+        .phil-method-card:nth-child(3) { animation-delay: 0.15s; }
+        .phil-method-card:nth-child(4) { animation-delay: 0.20s; }
+        .phil-method-card:nth-child(5) { animation-delay: 0.25s; }
+        .phil-method-card:nth-child(6) { animation-delay: 0.30s; }
+        .phil-method-card:nth-child(7) { animation-delay: 0.35s; }
+
+        /* Стиль для пустых авторов */
+        .phil-method-authors:empty {
+          display: none;
         }
       `}</style>
 
       <div className="phil-page">
         <nav className="phil-nav">
-          <a href="/">← На главную</a>
+          <Link href="/" className="phil-nav-link">
+            ← На главную
+          </Link>
         </nav>
 
         <header className="phil-hero">
           <h1 className="phil-title">Философия проекта</h1>
+          <p className="phil-subtitle">
+            Исследуйте внутреннюю территорию через семь направлений саморазвития
+          </p>
         </header>
 
         {/* Идея */}
