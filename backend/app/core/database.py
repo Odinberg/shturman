@@ -2,7 +2,7 @@
 Database engine and session configuration.
 """
 
-from fastapi import Request, Depends
+from fastapi import Request, Depends, HTTPException
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
@@ -45,9 +45,8 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> int:
     """
-    Dependency: возвращает user_id из JWT токена или 1 (dev-режим).
-    Для VK Mini App: токен передаётся в header Authorization: Bearer <token>
-    или параметры VK передаются через query string с подписью.
+    Dependency: возвращает user_id из JWT токена или VK-параметров.
+    Если аутентификация не пройдена — HTTPException(401).
     """
     from sqlalchemy import select
     from app.models.models import User
@@ -83,10 +82,26 @@ async def get_current_user(
 
     # Dev-режим: возвращаем пользователя по умолчанию (id=1)
     if settings.DEBUG:
-        # Убедимся, что пользователь-заглушка существует
         result = await db.execute(select(User).where(User.id == 1))
         if result.scalar_one_or_none():
             return 1
 
-    # Неаутентифицированный доступ — возвращаем 0 для read-only
-    return 0
+    # Неаутентифицированный доступ
+    raise HTTPException(
+        status_code=401,
+        detail="Требуется авторизация. Предоставьте JWT-токен или VK-параметры.",
+    )
+
+
+async def get_optional_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> int:
+    """
+    Dependency: как get_current_user, но не выбрасывает 401.
+    Возвращает user_id или 0 для неаутентифицированных read-only запросов.
+    """
+    try:
+        return await get_current_user(request, db)
+    except HTTPException:
+        return 0

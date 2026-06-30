@@ -45,10 +45,24 @@ echo ""
 echo "📦 Сборка образов..."
 docker compose -f docker-compose.prod.yml build --no-cache
 
-# --- Запуск ---
+# --- Запуск (сначала БД и Redis) ---
 echo ""
-echo "▶️  Запуск контейнеров..."
-docker compose -f docker-compose.prod.yml up -d --wait --wait-timeout 60
+echo "▶️  Запуск PostgreSQL и Redis..."
+docker compose -f docker-compose.prod.yml up -d postgres redis --wait --wait-timeout 60
+
+# --- Миграции ---
+echo ""
+echo "🗄️  Запуск миграций Alembic..."
+docker compose -f docker-compose.prod.yml exec -T backend \
+  sh -c "cd /app && alembic upgrade head" || {
+    echo "⚠️  Alembic migration failed — check connection"
+    exit 1
+}
+
+# --- Запуск остальных сервисов ---
+echo ""
+echo "▶️  Запуск backend и frontend..."
+docker compose -f docker-compose.prod.yml up -d backend frontend --wait --wait-timeout 60
 
 # --- Проверка ---
 echo ""

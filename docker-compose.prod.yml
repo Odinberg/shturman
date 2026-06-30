@@ -10,6 +10,11 @@ services:
     volumes:
       - shturman_pgdata:/var/lib/postgresql/data
     networks: [shturman_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shturman"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -18,9 +23,16 @@ services:
     volumes:
       - shturman_redisdata:/data
     networks: [shturman_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
     container_name: shturman-backend
     restart: unless-stopped
     environment:
@@ -34,7 +46,11 @@ services:
       DEBUG: "false"
     ports:
       - "9091:8000"
-    depends_on: [postgres, redis]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks: [shturman_net]
 
   frontend:

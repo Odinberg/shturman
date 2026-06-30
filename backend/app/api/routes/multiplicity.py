@@ -3,24 +3,37 @@ API: Направление 6 — Множественность Я
 Subpersonality posts, round table, family portrait, negotiator.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from app.core.database import get_db, get_current_user
+from app.api.schemas import SubpersonalityPostCreate, NegotiatorRequest, ApiResponse
+from app.services.prompts import get_prompt
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/posts")
-async def create_subpersonality_post(subpersonality: str, content: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def create_subpersonality_post(
+    body: SubpersonalityPostCreate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import SubpersonalityPost
-    post = SubpersonalityPost(user_id, subpersonality=subpersonality, content=content)
+    post = SubpersonalityPost(user_id=user_id, subpersonality=body.subpersonality, content=body.content)
     db.add(post)
     await db.flush()
-    return {"id": post.id, "status": "created"}
+    return ApiResponse(id=post.id, status="created")
 
 
 @router.get("/posts")
-async def list_posts(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_posts(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select
     result = await db.execute(
@@ -30,7 +43,10 @@ async def list_posts(db: AsyncSession = Depends(get_db), user_id: int = Depends(
 
 
 @router.get("/posts/stats")
-async def subpersonality_stats(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def subpersonality_stats(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select, func
     result = await db.execute(
@@ -42,12 +58,16 @@ async def subpersonality_stats(db: AsyncSession = Depends(get_db), user_id: int 
 
 
 @router.post("/round-table")
-async def generate_round_table(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_round_table(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Круглый стол (бонус Н6)."""
     from app.models.models import SubpersonalityPost, RoundTableSession
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -56,29 +76,21 @@ async def generate_round_table(db: AsyncSession = Depends(get_db), user_id: int 
     if len(posts) < 4:
         return {"error": f"Need 4+ subpersonality posts, have {len(posts)}"}
 
-    prompt_path = "app/prompts/round_table.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
-    data = "\n\n".join(
-        f"[{p.subpersonality}] {p.content}" for p in posts
-    )
+    system_prompt = get_prompt("round_table")
+    data = "\n\n".join(f"[{p.subpersonality}] {p.content}" for p in posts)
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Голоса капитана:\n\n{data}"},
-        ],
-        temperature=0.8, max_tokens=1000,
+    dialogue = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Голоса капитана:\n\n{data}",
+        temperature=0.8, max_tokens=1000, label="round_table",
     )
+    if not dialogue:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    dialogue = response.choices[0].message.content
     participants = list(set(p.subpersonality for p in posts))
-
     rt = RoundTableSession(
-        user_id,
+        user_id=user_id,
         participants_json=participants,
         dialogue_json={"raw": dialogue},
         moderator_note="",
@@ -89,12 +101,16 @@ async def generate_round_table(db: AsyncSession = Depends(get_db), user_id: int 
 
 
 @router.post("/family-portrait")
-async def generate_family_portrait(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_family_portrait(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Портрет семьи (бонус Н6)."""
     from app.models.models import SubpersonalityPost, FamilyPortrait
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -103,31 +119,24 @@ async def generate_family_portrait(db: AsyncSession = Depends(get_db), user_id: 
     if len(posts) < 2:
         return {"error": f"Need 2+ subpersonality posts, have {len(posts)}"}
 
-    prompt_path = "app/prompts/family_portrait.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
-    data = "\n\n".join(
-        f"[{p.subpersonality}] {p.content}" for p in posts
-    )
+    system_prompt = get_prompt("family_portrait")
+    data = "\n\n".join(f"[{p.subpersonality}] {p.content}" for p in posts)
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Субличности капитана:\n\n{data}"},
-        ],
-        temperature=0.8, max_tokens=1200,
+    portrait = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Субличности капитана:\n\n{data}",
+        temperature=0.8, max_tokens=1200, label="family_portrait",
     )
+    if not portrait:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    portrait = response.choices[0].message.content
     import re
     dalle_match = re.search(r"Промпт для генерации\s*[:(]\s*(.+?)(?:\n---|\n\n|$)", portrait, re.DOTALL)
     dalle_prompt = dalle_match.group(1).strip() if dalle_match else ""
 
     fp = FamilyPortrait(
-        user_id,
+        user_id=user_id,
         characters_json={"raw": portrait},
         portrait_text=portrait,
         dalle_prompt=dalle_prompt,
@@ -138,35 +147,39 @@ async def generate_family_portrait(db: AsyncSession = Depends(get_db), user_id: 
 
 
 @router.post("/negotiator")
-async def run_negotiator(critic_quote: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def run_negotiator(
+    body: NegotiatorRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Переговорщик vs Критик (бонус Н6)."""
     from app.models.models import NegotiatorSession
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
-    prompt_path = "app/prompts/negotiator.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = get_prompt("negotiator")
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": critic_quote},
-        ],
-        temperature=0.8, max_tokens=1000,
+    dialogue = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=body.critic_quote,
+        temperature=0.8, max_tokens=1000, label="negotiator",
     )
+    if not dialogue:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    dialogue = response.choices[0].message.content
-    ns = NegotiatorSession(user_id, critic_quote=critic_quote, dialogue_json={"raw": dialogue})
+    ns = NegotiatorSession(user_id=user_id, critic_quote=body.critic_quote, dialogue_json={"raw": dialogue})
     db.add(ns)
     await db.flush()
     return {"id": ns.id, "dialogue": dialogue}
 
 
 @router.get("/round-table")
-async def list_round_tables(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_round_tables(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import RoundTableSession
     from sqlalchemy import select
     result = await db.execute(
@@ -176,7 +189,10 @@ async def list_round_tables(db: AsyncSession = Depends(get_db), user_id: int = D
 
 
 @router.get("/family-portrait")
-async def list_portraits(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_portraits(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import FamilyPortrait
     from sqlalchemy import select
     result = await db.execute(

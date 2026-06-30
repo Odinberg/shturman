@@ -3,25 +3,34 @@ API: Направление 2 — Эмоциональный профиль
 Checkins, biorhythm, resource states, avatar.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db, get_current_user
+from app.api.schemas import EmotionalCheckinCreate, ApiResponse
+from app.services.prompts import get_prompt
 
 router = APIRouter()
 
 
 @router.post("/checkins")
-async def create_checkin(emoji: str, event_text: str = "", db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def create_checkin(
+    body: EmotionalCheckinCreate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import EmotionalCheckin
-    checkin = EmotionalCheckin(user_id, emoji=emoji, event_words=event_text)
+    checkin = EmotionalCheckin(user_id=user_id, emoji=body.emoji, event_words=body.event_text)
     db.add(checkin)
     await db.flush()
-    return {"id": checkin.id, "status": "logged"}
+    return ApiResponse(id=checkin.id, status="logged")
 
 
 @router.get("/checkins")
-async def list_checkins(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_checkins(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import EmotionalCheckin
     from sqlalchemy import select
     result = await db.execute(
@@ -35,7 +44,10 @@ async def list_checkins(db: AsyncSession = Depends(get_db), user_id: int = Depen
 
 
 @router.get("/checkins/streak")
-async def checkin_streak(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def checkin_streak(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import EmotionalCheckin
     from sqlalchemy import select, func, cast, Date
     result = await db.execute(
@@ -50,12 +62,16 @@ async def checkin_streak(db: AsyncSession = Depends(get_db), user_id: int = Depe
 
 
 @router.post("/biorhythm")
-async def generate_biorhythm(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_biorhythm(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Генерировать отчёт биоритмолога (бонус Н2)."""
     from app.models.models import EmotionalCheckin, BiorhythmReport
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.core.ai import safe_ai_call
     from datetime import datetime, timedelta, timezone
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
@@ -68,28 +84,22 @@ async def generate_biorhythm(db: AsyncSession = Depends(get_db), user_id: int = 
     if len(checkins) < 14:
         return {"error": f"Need 14+ checkins, have {len(checkins)}"}
 
-    prompt_path = "app/prompts/biorhythm.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
+    system_prompt = get_prompt("biorhythm")
     data = "\n".join(
         f"[{c.checkin_time.strftime('%a %d.%m %H:%M')}] {c.emoji} — {c.event_words}"
         for c in checkins
     )
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Вот {len(checkins)} чекинов за 14+ дней:\n\n{data}"},
-        ],
-        temperature=0.7, max_tokens=1000,
+    report_text = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Вот {len(checkins)} чекинов за 14+ дней:\n\n{data}",
+        temperature=0.7, max_tokens=1000, label="biorhythm",
     )
+    if not report_text:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    report_text = response.choices[0].message.content
-
-    report = BiorhythmReport(user_id, period_days=len(checkins), report_text=report_text)
+    report = BiorhythmReport(user_id=user_id, period_days=len(checkins), report_text=report_text)
     db.add(report)
     await db.flush()
 
@@ -97,7 +107,10 @@ async def generate_biorhythm(db: AsyncSession = Depends(get_db), user_id: int = 
 
 
 @router.get("/biorhythm")
-async def list_biorhythm_reports(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_biorhythm_reports(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import BiorhythmReport
     from sqlalchemy import select
     result = await db.execute(
@@ -107,39 +120,37 @@ async def list_biorhythm_reports(db: AsyncSession = Depends(get_db), user_id: in
 
 
 @router.post("/resources")
-async def generate_resource_collection(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_resource_collection(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Генерировать коллекцию ресурсных состояний (бонус Н2)."""
-    from app.models.models import JournalEntry, EmotionalCheckin, ResourceCollection
+    from app.models.models import JournalEntry, ResourceCollection
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(JournalEntry).where(JournalEntry.user_id == user_id).order_by(JournalEntry.created_at.desc()).limit(50)
     )
     entries = result.scalars().all()
 
-    prompt_path = "app/prompts/resource_states.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
+    system_prompt = get_prompt("resource_states")
     data = "\n\n".join(f"[{e.created_at.strftime('%d.%m')}] {e.content}" for e in entries)
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Вот записи за месяц:\n\n{data}"},
-        ],
-        temperature=0.7, max_tokens=1500,
+    resources = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Вот записи за месяц:\n\n{data}",
+        temperature=0.7, max_tokens=1500, label="resource_states",
     )
-
-    resources = response.choices[0].message.content
+    if not resources:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
     from datetime import datetime
     month = datetime.now().strftime("%Y-%m")
-    rc = ResourceCollection(user_id, month=month, resources_json={"raw": resources})
+    rc = ResourceCollection(user_id=user_id, month=month, resources_json={"raw": resources})
     db.add(rc)
     await db.flush()
 
@@ -147,7 +158,10 @@ async def generate_resource_collection(db: AsyncSession = Depends(get_db), user_
 
 
 @router.get("/resources")
-async def list_resource_collections(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_resource_collections(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ResourceCollection
     from sqlalchemy import select
     result = await db.execute(
@@ -157,12 +171,16 @@ async def list_resource_collections(db: AsyncSession = Depends(get_db), user_id:
 
 
 @router.post("/avatar")
-async def generate_avatar(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_avatar(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Генерировать эмоциональный аватар недели (бонус Н2)."""
     from app.models.models import EmotionalCheckin, EmotionalAvatar
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.core.ai import safe_ai_call
     from datetime import datetime, timedelta, timezone
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
@@ -175,31 +193,25 @@ async def generate_avatar(db: AsyncSession = Depends(get_db), user_id: int = Dep
     if len(checkins) < 7:
         return {"error": f"Need 7 checkins for a week, have {len(checkins)}"}
 
-    prompt_path = "app/prompts/emotional_avatar.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
+    system_prompt = get_prompt("emotional_avatar")
     data = "\n".join(f"[{c.checkin_time.strftime('%a %H:%M')}] {c.emoji} — {c.event_words}" for c in checkins)
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Чекины за эту неделю:\n\n{data}"},
-        ],
-        temperature=0.8, max_tokens=800,
+    avatar_text = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Чекины за эту неделю:\n\n{data}",
+        temperature=0.8, max_tokens=800, label="emotional_avatar",
     )
-
-    avatar_text = response.choices[0].message.content
+    if not avatar_text:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
     import re
     dalle_match = re.search(r"Промпт для генерации:\s*(.+?)(?:\n|$)", avatar_text)
     dalle_prompt = dalle_match.group(1).strip() if dalle_match else ""
 
     avatar = EmotionalAvatar(
-        user_id,
-        week_start=cutoff.date(),
+        user_id=user_id,
+        week_start=datetime.now().date() - timedelta(days=6),
         avatar_text=avatar_text,
         dalle_prompt=dalle_prompt,
     )
@@ -210,11 +222,13 @@ async def generate_avatar(db: AsyncSession = Depends(get_db), user_id: int = Dep
 
 
 @router.get("/avatar")
-async def list_avatars(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_avatars(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import EmotionalAvatar
     from sqlalchemy import select
     result = await db.execute(
-        select(EmotionalAvatar).where(EmotionalAvatar.user_id == user_id)
-        .order_by(EmotionalAvatar.week_start.desc()).limit(10)
+        select(EmotionalAvatar).where(EmotionalAvatar.user_id == user_id).order_by(EmotionalAvatar.created_at.desc()).limit(10)
     )
     return [{"id": a.id, "week": str(a.week_start), "dalle_prompt": a.dalle_prompt, "created_at": a.created_at.isoformat()} for a in result.scalars().all()]

@@ -3,32 +3,43 @@ API: Направление 3 — Рефрейминг (Reframing)
 Sessions, AI advocate, insight box, blind spot.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from app.core.database import get_db, get_current_user
+from app.api.schemas import ReframingSessionCreate, BlindSpotRequest, AIAdvocateRequest, ApiResponse
+from app.services.prompts import get_prompt
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/sessions")
-async def create_reframing_session(situation: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def create_reframing_session(
+    body: ReframingSessionCreate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ReframingSession
-    from openai import AsyncOpenAI
-    from app.core.config import settings
-
-    session = ReframingSession(user_id, situation_text=situation, perspectives_json={"5_views": []})
+    session = ReframingSession(user_id=user_id, situation_text=body.situation, perspectives_json={"5_views": []})
     db.add(session)
     await db.flush()
-    return {"id": session.id, "status": "created"}
+    return ApiResponse(id=session.id, status="created")
 
 
 @router.post("/insight-box")
-async def generate_insight_box(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_insight_box(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Шкатулка формулировок (бонус Н3)."""
     from app.models.models import ReframingSession, InsightBox
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
     result = await db.execute(
         select(ReframingSession).where(ReframingSession.user_id == user_id).order_by(ReframingSession.created_at.desc()).limit(20)
@@ -37,57 +48,49 @@ async def generate_insight_box(db: AsyncSession = Depends(get_db), user_id: int 
     if len(sessions) < 3:
         return {"error": f"Need 3+ sessions, have {len(sessions)}"}
 
-    prompt_path = "app/prompts/insight_box.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
+    system_prompt = get_prompt("insight_box")
     data = "\n\n".join(
         f"[{s.created_at.strftime('%d.%m')}] Ситуация: {s.situation_text[:300]}" for s in sessions
     )
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Разобранные ситуации:\n\n{data}"},
-        ],
-        temperature=0.7, max_tokens=1500,
+    box_text = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"Разобранные ситуации:\n\n{data}",
+        temperature=0.7, max_tokens=1500, label="insight_box",
     )
+    if not box_text:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    box_text = response.choices[0].message.content
-    ib = InsightBox(
-        user_id,
-        session_ids=[s.id for s in sessions],
-        box_content=box_text,
-    )
+    ib = InsightBox(user_id=user_id, session_ids=[s.id for s in sessions], box_content=box_text)
     db.add(ib)
     await db.flush()
     return {"id": ib.id, "box": box_text}
 
 
 @router.post("/blind-spot")
-async def blind_spot(query: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def blind_spot(
+    body: BlindSpotRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Слепое пятно (бонус Н3)."""
     from app.models.models import BlindSpotSession
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
-    prompt_path = "app/prompts/blind_spot.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = get_prompt("blind_spot")
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query},
-        ],
-        temperature=0.8, max_tokens=500,
+    result_text = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=body.query,
+        temperature=0.8, max_tokens=500, label="blind_spot",
     )
+    if not result_text:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    result_text = response.choices[0].message.content
     lines = [l.strip() for l in result_text.split('\n') if l.strip()]
     q1 = q2 = ""
     for i, l in enumerate(lines):
@@ -96,36 +99,41 @@ async def blind_spot(query: str, db: AsyncSession = Depends(get_db), user_id: in
         if l.startswith("Вопрос 2:") or (q1 and l.startswith("Вопрос") and not l.startswith("Вопрос 1")):
             q2 = l.split(":", 1)[-1].strip() if ":" in l else ""
 
-    bs = BlindSpotSession(user_id, user_query=query, question_1=q1, question_2=q2)
+    bs = BlindSpotSession(user_id=user_id, user_query=body.query, question_1=q1, question_2=q2)
     db.add(bs)
     await db.flush()
     return {"id": bs.id, "result": result_text}
 
 
 @router.post("/ai-advocate")
-async def ai_advocate(query: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def ai_advocate(
+    body: AIAdvocateRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """ИИ-адвокат (бонус Н3)."""
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
-    prompt_path = "app/prompts/ai_advocate.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = get_prompt("ai_advocate")
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query},
-        ],
-        temperature=0.7, max_tokens=1000,
+    response = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=body.query,
+        temperature=0.7, max_tokens=1000, label="ai_advocate",
     )
-    return {"response": response.choices[0].message.content}
+    if not response:
+        return {"error": "AI временно недоступен, попробуйте позже"}
+    return {"response": response}
 
 
 @router.get("/sessions")
-async def list_reframing_sessions(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_reframing_sessions(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ReframingSession
     from sqlalchemy import select
     result = await db.execute(
@@ -135,7 +143,10 @@ async def list_reframing_sessions(db: AsyncSession = Depends(get_db), user_id: i
 
 
 @router.get("/insight-box")
-async def list_insight_boxes(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_insight_boxes(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import InsightBox
     from sqlalchemy import select
     result = await db.execute(

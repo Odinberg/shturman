@@ -3,24 +3,37 @@ API: Направление 7 — Эффект Бабочки
 Butterfly events, fractal cards, wonder vaults.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from app.core.database import get_db, get_current_user
+from app.api.schemas import ButterflyEventCreate, FractalRequest, ApiResponse
+from app.services.prompts import get_prompt
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/events")
-async def create_butterfly_event(event_text: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def create_butterfly_event(
+    body: ButterflyEventCreate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ButterflyEvent
-    ev = ButterflyEvent(user_id, event_text=event_text)
+    ev = ButterflyEvent(user_id=user_id, event_text=body.event_text)
     db.add(ev)
     await db.flush()
-    return {"id": ev.id, "status": "logged"}
+    return ApiResponse(id=ev.id, status="logged")
 
 
 @router.get("/events")
-async def list_events(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_events(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ButterflyEvent
     from sqlalchemy import select
     result = await db.execute(
@@ -30,9 +43,12 @@ async def list_events(db: AsyncSession = Depends(get_db), user_id: int = Depends
 
 
 @router.get("/events/count")
-async def event_stats(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def event_stats(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import ButterflyEvent
-    from sqlalchemy import select, func, cast, Date
+    from sqlalchemy import select, func
     result = await db.execute(
         select(func.count(ButterflyEvent.id)).where(ButterflyEvent.user_id == user_id)
     )
@@ -41,44 +57,53 @@ async def event_stats(db: AsyncSession = Depends(get_db), user_id: int = Depends
 
 
 @router.post("/fractal")
-async def generate_fractal(event_id: int, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_fractal(
+    body: FractalRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Фрактал дня (бонус Н7)."""
     from app.models.models import ButterflyEvent, FractalCard
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
-    event = await db.get(ButterflyEvent, event_id)
+    event = await db.get(ButterflyEvent, body.event_id)
     if not event:
-        return {"error": "event not found"}, 404
+        return {"error": "event not found"}
 
-    prompt_path = "app/prompts/fractal_day.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = get_prompt("fractal_day")
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
+    insight = await safe_ai_call(
+        client=client,
         model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Событие: {event.event_text}"},
-        ],
-        temperature=0.8, max_tokens=800,
+        system=system_prompt,
+        user=f"Событие: {event.event_text}",
+        temperature=0.8,
+        max_tokens=800,
+        label="fractal_day",
     )
+    if not insight:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
-    insight = response.choices[0].message.content
-    fc = FractalCard(user_id, event_id=event_id, association_chain={"raw": insight}, insight_text=insight)
+    fc = FractalCard(user_id=user_id, event_id=body.event_id, association_chain={"raw": insight}, insight_text=insight)
     db.add(fc)
     await db.flush()
     return {"id": fc.id, "insight": insight}
 
 
 @router.post("/vault")
-async def generate_wonder_vault(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def generate_wonder_vault(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Копилка чудес (бонус Н7)."""
     from app.models.models import ButterflyEvent, WonderVault
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
+    from app.services.ai import safe_ai_call
 
     result = await db.execute(
         select(ButterflyEvent).where(ButterflyEvent.user_id == user_id).order_by(ButterflyEvent.event_date.asc()).limit(100)
@@ -87,34 +112,31 @@ async def generate_wonder_vault(db: AsyncSession = Depends(get_db), user_id: int
     if len(events) < 7:
         return {"error": f"Need 7+ events, have {len(events)}"}
 
-    prompt_path = "app/prompts/wonder_vault.md"
-    with open(prompt_path, encoding="utf-8") as f:
-        system_prompt = f.read()
-
+    system_prompt = get_prompt("wonder_vault")
     data = "\n".join(f"[{e.event_date}] {e.event_text}" for e in events)
 
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    response = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"30 событий месяца:\n\n{data}"},
-        ],
-        temperature=0.8, max_tokens=1500,
+    vault_text = await safe_ai_call(
+        client=client, model=settings.OPENAI_MODEL,
+        system=system_prompt, user=f"30 событий месяца:\n\n{data}",
+        temperature=0.8, max_tokens=1500, label="wonder_vault",
     )
-
-    vault_text = response.choices[0].message.content
+    if not vault_text:
+        return {"error": "AI временно недоступен, попробуйте позже"}
 
     from datetime import datetime
     month = datetime.now().strftime("%Y-%m")
-    wv = WonderVault(user_id, month=month, slideshow_text=vault_text)
+    wv = WonderVault(user_id=user_id, month=month, slideshow_text=vault_text)
     db.add(wv)
     await db.flush()
     return {"id": wv.id, "vault": vault_text}
 
 
 @router.get("/fractal")
-async def list_fractals(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_fractals(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import FractalCard
     from sqlalchemy import select
     result = await db.execute(
@@ -124,7 +146,10 @@ async def list_fractals(db: AsyncSession = Depends(get_db), user_id: int = Depen
 
 
 @router.get("/vault")
-async def list_vaults(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_vaults(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import WonderVault
     from sqlalchemy import select
     result = await db.execute(

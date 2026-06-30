@@ -11,3 +11,5 @@ openai==2.7.1
 httpx==0.28.1
 python-multipart==0.0.20
 pydantic-settings==2.9.1
+slowapi==0.1.9
+aiofiles==24.1.0

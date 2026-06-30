@@ -3,27 +3,36 @@ API: Направление 5 — Сенсорные якоря
 Sensory checkins, predictions, calm anchors.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from app.core.database import get_db, get_current_user
+from app.api.schemas import SensoryCheckinCreate, ApiResponse
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/checkins")
-async def create_sensory_checkin(sensation: str, db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def create_sensory_checkin(
+    body: SensoryCheckinCreate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import SensoryCheckin
-    from app.models.models import SENSATION_TYPES
-    if sensation not in SENSATION_TYPES:
-        return {"error": f"Must be one of: {', '.join(SENSATION_TYPES)}"}
-    sc = SensoryCheckin(user_id, sensation=sensation)
+    sc = SensoryCheckin(user_id=user_id, sensation=body.sensation)
     db.add(sc)
     await db.flush()
-    return {"id": sc.id, "status": "logged"}
+    return ApiResponse(id=sc.id, status="logged")
 
 
 @router.get("/checkins")
-async def list_sensory_checkins(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def list_sensory_checkins(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
     result = await db.execute(
@@ -33,7 +42,10 @@ async def list_sensory_checkins(db: AsyncSession = Depends(get_db), user_id: int
 
 
 @router.get("/kinetic-data")
-async def kinetic_animation_data(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def kinetic_animation_data(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Данные для кинетического дневника (бонус Н5)."""
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
@@ -52,18 +64,24 @@ async def kinetic_animation_data(db: AsyncSession = Depends(get_db), user_id: in
 
 
 @router.post("/anchor/save")
-async def save_calm_anchor(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def save_calm_anchor(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Сохранить якорь спокойствия (бонус Н5)."""
     from app.models.models import CalmAnchor
     pattern = [500, 200, 500, 200, 500]
-    anchor = CalmAnchor(user_id, vibration_pattern=pattern, breathing_rhythm="4-7-8")
+    anchor = CalmAnchor(user_id=user_id, vibration_pattern=pattern, breathing_rhythm="4-7-8")
     db.add(anchor)
     await db.flush()
     return {"id": anchor.id, "vibration_pattern": pattern, "status": "saved"}
 
 
 @router.get("/anchor/play")
-async def play_calm_anchor(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def play_calm_anchor(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     from app.models.models import CalmAnchor
     from sqlalchemy import select
     result = await db.execute(
@@ -76,7 +94,10 @@ async def play_calm_anchor(db: AsyncSession = Depends(get_db), user_id: int = De
 
 
 @router.get("/predict")
-async def predict_state(db: AsyncSession = Depends(get_db), user_id: int = Depends(get_current_user)):
+async def predict_state(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+):
     """Предсказание телесного компаса."""
     from app.models.models import SensoryCheckin
     from sqlalchemy import select
