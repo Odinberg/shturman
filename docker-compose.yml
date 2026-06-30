@@ -64,7 +64,7 @@ services:
     container_name: shturman-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_API_URL: https://vnutrenniy-kompas.ru/api
     ports:
       - "3000:3000"
     depends_on:
