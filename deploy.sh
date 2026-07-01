@@ -61,8 +61,8 @@ docker compose -f docker-compose.prod.yml exec -T backend \
 
 # --- Запуск остальных сервисов ---
 echo ""
-echo "▶️  Запуск backend, frontend и nginx..."
-docker compose -f docker-compose.prod.yml up -d backend frontend nginx --wait --wait-timeout 60
+echo "▶️  Запуск backend и frontend..."
+docker compose -f docker-compose.prod.yml up -d backend frontend --wait --wait-timeout 60
 
 # --- Проверка ---
 echo ""
@@ -83,17 +83,17 @@ else
     echo "  ❌ Redis — не отвечает"
 fi
 
-# Проверка nginx (через него идёт весь трафик к backend и frontend)
+# Проверка бэкенда
 sleep 2
-if curl -sf -o /dev/null http://localhost/health 2>&1; then
-    echo "  ✅ Nginx → Backend — OK"
+if curl -sf -o /dev/null http://localhost:9091/health 2>&1; then
+    echo "  ✅ Backend — OK"
 else
-    echo "  ⚠️  Nginx — проверьте логи: docker compose -f docker-compose.prod.yml logs nginx"
+    echo "  ⚠️  Backend — проверьте логи: docker compose -f docker-compose.prod.yml logs backend"
 fi
 
 # Проверка фронтенда
-if curl -sf -o /dev/null http://localhost/ 2>&1; then
-    echo "  ✅ Frontend (через nginx) — OK"
+if curl -sf -o /dev/null http://localhost:9090/ 2>&1; then
+    echo "  ✅ Frontend — OK"
 else
     echo "  ⚠️  Frontend — проверьте логи: docker compose -f docker-compose.prod.yml logs frontend"
 fi
