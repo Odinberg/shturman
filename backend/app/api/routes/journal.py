@@ -3,17 +3,21 @@ API: Направление 1 — Активный дневник (Resonance)
 Journal entries, pattern maps, alt reality.
 """
 
-from fastapi import APIRouter, Depends, Body
+from typing import List
+from fastapi import APIRouter, Depends, Body, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db, get_current_user
-from app.api.schemas import JournalEntryCreate, AltRealityRequest, ApiResponse
+from app.api.schemas import (
+    JournalEntryCreate, JournalEntryResponse,
+    AltRealityRequest, ApiResponse,
+)
 from app.services.prompts import get_prompt
 
 router = APIRouter()
 
 
-@router.get("/entries")
+@router.get("/entries", response_model=List[JournalEntryResponse])
 async def list_entries(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
@@ -24,7 +28,7 @@ async def list_entries(
         select(JournalEntry).where(JournalEntry.user_id == user_id).order_by(JournalEntry.created_at.desc()).limit(50)
     )
     entries = result.scalars().all()
-    return [{"id": e.id, "content": e.content[:200], "mood": e.mood, "created_at": e.created_at.isoformat()} for e in entries]
+    return [JournalEntryResponse(id=e.id, content=e.content[:200], mood=e.mood, created_at=e.created_at.isoformat()) for e in entries]
 
 
 @router.post("/entries")
@@ -40,7 +44,7 @@ async def create_entry(
     return ApiResponse(id=entry.id, status="created")
 
 
-@router.get("/entries/{entry_id}")
+@router.get("/entries/{entry_id}", response_model=JournalEntryResponse)
 async def get_entry(
     entry_id: int,
     db: AsyncSession = Depends(get_db),
@@ -49,8 +53,8 @@ async def get_entry(
     from app.models.models import JournalEntry
     result = await db.get(JournalEntry, entry_id)
     if not result or result.user_id != user_id:
-        return {"error": "not found"}
-    return {"id": result.id, "content": result.content, "mood": result.mood, "created_at": result.created_at.isoformat()}
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return JournalEntryResponse(id=result.id, content=result.content, mood=result.mood, created_at=result.created_at.isoformat())
 
 
 @router.post("/patterns/generate")

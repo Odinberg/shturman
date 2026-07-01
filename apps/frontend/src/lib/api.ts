@@ -25,6 +25,7 @@ async function request<T>(
   path: string,
   method: string = 'GET',
   body?: Record<string, any>,
+  retries: number = 3,
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {};
@@ -38,12 +39,39 @@ async function request<T>(
     options.body = JSON.stringify(body);
   }
 
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text}`);
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const text = await res.text();
+        const isRetryable = res.status === 502 || res.status === 503;
+        if (isRetryable && attempt < retries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`[API] Retry ${attempt}/${retries} for ${method} ${path}: ${res.status}`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new Error(`API ${res.status}: ${text}`);
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
+        if (attempt < retries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.warn(`[API] Network error retry ${attempt}/${retries} for ${method} ${path}`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new Error('Network error: Unable to reach server');
+      }
+      // Re-throw API errors (non-retryable)
+      if (error instanceof Error && error.message.startsWith('API ')) {
+        throw error;
+      }
+      throw error;
+    }
   }
-  return res.json();
+  throw new Error('Unreachable');
 }
 
 function jget<T>(path: string): Promise<T> {

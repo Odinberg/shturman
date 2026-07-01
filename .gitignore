@@ -60,3 +60,12 @@ test-output
 .env.prod
 .env.local
 .env.*.local
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# SSL certs (keep .gitkeep)
+nginx/ssl/*
+!nginx/ssl/.gitkeep

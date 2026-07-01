@@ -6,6 +6,8 @@ from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 
+from app.models.models import AltRealityGenre
+
 
 # ─── Health ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +25,7 @@ class JournalEntryCreate(BaseModel):
 
 class AltRealityRequest(BaseModel):
     entry_id: int = Field(..., gt=0)
-    genre: str = Field(..., pattern=r"^(hobbit|detective|manual|naturalist)$")
+    genre: AltRealityGenre
 
 
 class JournalEntryResponse(BaseModel):

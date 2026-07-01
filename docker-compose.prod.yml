@@ -67,6 +67,22 @@ services:
     depends_on: [backend]
     networks: [shturman_net]
 
+  nginx:
+    image: nginx:alpine
+    container_name: shturman-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/certs:ro
+      - /volume1/web_images:/var/host-images/web_images:ro
+    depends_on:
+      - frontend
+      - backend
+    networks: [shturman_net]
+
 volumes:
   shturman_pgdata:
   shturman_redisdata:

@@ -176,6 +176,7 @@ export default function Home() {
   const vkAuth = useVkAuth();
   const [stats, setStats] = useState<DashboardStats>({ journal:0, emotional:0, butterfly:0, sensory:0, shadow:0, reframing:0, self:0 });
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -188,6 +189,10 @@ export default function Home() {
       multiplicityAPI.listPosts().then(r => r.length).catch(() => 0),
     ]).then(([j, e, b, se, sh, r, m]) => {
       setStats({ journal: j, emotional: e, butterfly: b, sensory: se, shadow: sh, reframing: r, self: m });
+      setStatsLoaded(true);
+    }).catch((error) => {
+      console.error('Failed to load stats:', error);
+      setStatsError(error?.message || 'Не удалось загрузить статистику');
       setStatsLoaded(true);
     });
   }, []);
@@ -527,7 +532,16 @@ export default function Home() {
       </section>
 
       {/* Дашборд */}
-      {statsLoaded && <Dashboard stats={stats} />}
+      {statsError && (
+        <section className="content-section">
+          <div className="container">
+            <div style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--border-radius)', padding: '1rem', textAlign: 'center', color: 'var(--color-gold)' }}>
+              ⚠️ {statsError}
+            </div>
+          </div>
+        </section>
+      )}
+      {statsLoaded && !statsError && <Dashboard stats={stats} />}
 
       {/* О проекте */}
       <section className="content-section" id="about">

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.models import User
+from app.services.user_service import get_or_create_user
 
 router = APIRouter()
 
@@ -157,20 +158,8 @@ async def vk_oauth_callback(
     # Шаг 2: проверяем членство в закрытой группе Архипелаг
     await _check_group_membership(vk_user_id, user_access_token=user_access_token)
 
-    # Шаг 3: ищем или создаём пользователя
-    result = await db.execute(
-        select(User).where(User.vk_user_id == vk_user_id)
-    )
-    user = result.scalar_one_or_none()
-
-    if not user:
-        user = User(
-            username=f"vk_{vk_user_id}",
-            vk_user_id=str(vk_user_id),
-        )
-        db.add(user)
-        await db.flush()
-
+    # Шаг 3: ищем или создаём пользователя (защита от race condition)
+    user = await get_or_create_user(db, vk_user_id)
     return await _generate_token(user)
 
 
@@ -225,18 +214,6 @@ async def vk_auth(
         vk_viewer_group_role=vk_viewer_group_role,
     )
 
-    # Ищем или создаём пользователя
-    result = await db.execute(
-        select(User).where(User.vk_user_id == vk_user_id)
-    )
-    user = result.scalar_one_or_none()
-
-    if not user:
-        user = User(
-            username=f"vk_{vk_user_id}",
-            vk_user_id=vk_user_id,
-        )
-        db.add(user)
-        await db.flush()
-
+    # Ищем или создаём пользователя (защита от race condition)
+    user = await get_or_create_user(db, vk_user_id)
     return await _generate_token(user)

@@ -2,9 +2,12 @@
 Application settings.
 """
 
+import logging
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -39,8 +42,22 @@ class Settings(BaseSettings):
     VK_SERVICE_TOKEN: str = ""
 
     # VK Group ID — закрытая группа, доступ только для участников
-    # Если не задан — проверка членства отключена (любой VK-пользователь)
+    # Если 0 или невалидное значение — проверка членства отключена
     VK_GROUP_ID: int = 0
+
+    @field_validator("VK_GROUP_ID", mode="before")
+    @classmethod
+    def coerce_group_id(cls, v):
+        """Fail closed: невалидное значение → ошибка, приложение не стартует."""
+        if v is None or v == "":
+            return 0
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            raise ValueError(
+                f"VK_GROUP_ID='{v}' — невалидное значение. "
+                "Укажите числовой ID группы или 0 для отключения проверки членства."
+            )
 
     # Domain
     DOMAIN: str = "vnutrenniy-kompas.ru"
@@ -77,8 +94,7 @@ class Settings(BaseSettings):
                 raise ValueError("OPENAI_API_KEY must be set via environment variable or .env file.")
         elif not self.JWT_SECRET:
             # Dev mode: provide a warning but don't block
-            import warnings
-            warnings.warn(
+            logger.warning(
                 "WARNING: JWT_SECRET not set. Using weak dev default. "
                 "Set JWT_SECRET in .env for production."
             )

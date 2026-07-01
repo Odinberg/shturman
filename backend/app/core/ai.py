@@ -3,9 +3,12 @@ AI-клиент (OpenAI-совместимый: DeepSeek, OpenAI и др.)
 с обработкой ошибок и переиспользуемым клиентом.
 """
 
+import logging
 from typing import Optional
 from openai import AsyncOpenAI, APIStatusError, APIConnectionError, RateLimitError
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 _client: Optional[AsyncOpenAI] = None
@@ -53,14 +56,14 @@ async def safe_ai_call(
         return response.choices[0].message.content
 
     except RateLimitError:
-        print(f"[{label}] Rate limit exceeded")
+        logger.error(f"[{label}] AI rate limit exceeded")
         return None
-    except APIConnectionError:
-        print(f"[{label}] API connection error")
+    except APIConnectionError as e:
+        logger.error(f"[{label}] AI connection error: {e}")
         return None
     except APIStatusError as e:
-        print(f"[{label}] API status error: {e.status_code} {e.message}")
+        logger.error(f"[{label}] AI API error {e.status_code}: {e.message}")
         return None
     except Exception as e:
-        print(f"[{label}] Unexpected AI error: {type(e).__name__}: {e}")
+        logger.exception(f"[{label}] Unexpected AI error: {type(e).__name__}")
         return None

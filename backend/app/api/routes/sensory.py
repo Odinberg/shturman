@@ -69,9 +69,9 @@ async def save_calm_anchor(
     user_id: int = Depends(get_current_user),
 ):
     """Сохранить якорь спокойствия (бонус Н5)."""
-    from app.models.models import CalmAnchor
+    from app.models.models import CalmAnchor, BreathingRhythm
     pattern = [500, 200, 500, 200, 500]
-    anchor = CalmAnchor(user_id=user_id, vibration_pattern=pattern, breathing_rhythm="4-7-8")
+    anchor = CalmAnchor(user_id=user_id, vibration_pattern=pattern, breathing_rhythm=BreathingRhythm.FOUR_SEVEN_EIGHT)
     db.add(anchor)
     await db.flush()
     return {"id": anchor.id, "vibration_pattern": pattern, "status": "saved"}
