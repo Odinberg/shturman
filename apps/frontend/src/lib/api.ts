@@ -241,33 +241,33 @@ export const sensoryAPI = {
     ),
 };
 
-// ─── D6: Множественность Я (auth/subpersonality) ────────────────────────
+// ─── D6: Множественность Я (self) ─────────────────────────────────────────
 
 export const multiplicityAPI = {
   createPost: (subpersonality: string, content: string) =>
-    jpost<{ id: number; status: string }>('/auth/posts', { subpersonality, content }),
+    jpost<{ id: number; status: string }>('/self/posts', { subpersonality, content }),
   listPosts: () =>
     jget<{ id: number; subpersonality: string; content: string; date: string }[]>(
-      '/auth/posts',
+      '/self/posts',
     ),
-  stats: () => jget<{ persona: string; count: number }[]>('/auth/posts/stats'),
+  stats: () => jget<{ persona: string; count: number }[]>('/self/posts/stats'),
   generateRoundTable: () =>
     jpostEmpty<{ id: number; dialogue: string; participants: string[] }>(
-      '/auth/round-table',
+      '/self/round-table',
     ),
   generateFamilyPortrait: () =>
     jpostEmpty<{ id: number; portrait: string; dalle_prompt: string }>(
-      '/auth/family-portrait',
+      '/self/family-portrait',
     ),
   generateNegotiator: (critic_quote: string) =>
-    jpost<{ id: number; dialogue: string }>('/auth/negotiator', { critic_quote }),
+    jpost<{ id: number; dialogue: string }>('/self/negotiator', { critic_quote }),
   listRoundTables: () =>
     jget<{ id: number; participants: string[]; created_at: string }[]>(
-      '/auth/round-table',
+      '/self/round-table',
     ),
   listPortraits: () =>
     jget<{ id: number; dalle_prompt: string; created_at: string }[]>(
-      '/auth/family-portrait',
+      '/self/family-portrait',
     ),
 };
 

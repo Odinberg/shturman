@@ -34,8 +34,8 @@ api_router.include_router(shadow.router, prefix="/shadow", tags=["shadow"])
 # Direction 5 — Сенсорные якоря
 api_router.include_router(sensory.router, prefix="/sensory", tags=["sensory"])
 
-# Direction 6 — Множественность Я (legacy prefix: /auth, future: /self)
-api_router.include_router(multiplicity.router, prefix="/auth", tags=["multiplicity"])
+# Direction 6 — Множественность Я
+api_router.include_router(multiplicity.router, prefix="/self", tags=["multiplicity"])
 
 # Direction 7 — Эффект Бабочки
 api_router.include_router(butterfly.router, prefix="/butterfly", tags=["butterfly"])

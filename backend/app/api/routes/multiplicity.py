@@ -22,6 +22,7 @@ async def create_subpersonality_post(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ):
+    """Создать запись от лица субличности (Н6-основа)."""
     from app.models.models import SubpersonalityPost
     post = SubpersonalityPost(user_id=user_id, subpersonality=body.subpersonality, content=body.content)
     db.add(post)
@@ -34,6 +35,7 @@ async def list_posts(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ):
+    """Список последних 50 записей субличностей пользователя."""
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select
     result = await db.execute(
@@ -47,6 +49,7 @@ async def subpersonality_stats(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ):
+    """Статистика — сколько записей от каждой субличности."""
     from app.models.models import SubpersonalityPost
     from sqlalchemy import select, func
     result = await db.execute(
@@ -180,6 +183,7 @@ async def list_round_tables(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ):
+    """Список последних сессий Круглого стола."""
     from app.models.models import RoundTableSession
     from sqlalchemy import select
     result = await db.execute(
@@ -193,6 +197,7 @@ async def list_portraits(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ):
+    """Список последних портретов семьи субличностей."""
     from app.models.models import FamilyPortrait
     from sqlalchemy import select
     result = await db.execute(
