@@ -12,7 +12,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, async_session
 from app.api.router import api_router
 from app.services.prompts import reload_prompts, list_prompts
 
@@ -42,6 +42,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +65,16 @@ async def startup():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("ℹ️  Dev mode: tables auto-created (production uses Alembic)")
+
+        # Create default dev user if none exists
+        from sqlalchemy import select
+        from app.models.models import User
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.id == 1))
+            if not result.scalar_one_or_none():
+                session.add(User(id=1, username="dev_user"))
+                await session.commit()
+                print("👤 Dev mode: default user created (id=1)")
 
 
 @app.get("/health")

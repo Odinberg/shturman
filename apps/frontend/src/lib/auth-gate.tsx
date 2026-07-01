@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { getAuthToken } from './api';
 
 const VK_OAUTH_URL =
-  'https://id.vk.com/auth' +
+  'https://id.vk.com/authorize' +
   '?app_id=54657524' +
   '&redirect_uri=https://vnutrenniy-kompas.ru/auth/callback' +
   '&response_type=code' +
-  '&scope=email';
+  '&scope=email' +
+  '&v=5.199';
 
 interface AuthGateProps {
   children: React.ReactNode;
@@ -20,10 +21,22 @@ interface AuthGateProps {
  */
 export function AuthGate({ children }: AuthGateProps) {
   const [token, setToken] = useState<string | null>();
+  const [isLocal, setIsLocal] = useState(false);
 
   useEffect(() => {
     setToken(getAuthToken());
+    // Dev-режим: локальная сеть — обходим авторизацию
+    const hostname = window.location.hostname;
+    setIsLocal(
+      hostname === 'localhost' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname),
+    );
   }, []);
+
+  if (isLocal) return <>{children}</>;
 
   // Ждём первого чтения токена на клиенте
   if (token === undefined) return null;

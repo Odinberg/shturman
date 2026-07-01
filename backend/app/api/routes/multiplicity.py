@@ -67,7 +67,7 @@ async def generate_round_table(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -110,7 +110,7 @@ async def generate_family_portrait(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -156,7 +156,7 @@ async def run_negotiator(
     from app.models.models import NegotiatorSession
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     system_prompt = get_prompt("negotiator")
 

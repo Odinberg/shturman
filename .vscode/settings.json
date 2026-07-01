@@ -1,6 +1,5 @@
 {
     "projectColors.mainColor": "#f02472",
-    "window.title": "shturman",
     "workbench.colorCustomizations": {
         "statusBarItem.warningBackground": "#f02472",
         "statusBarItem.warningForeground": "#ffffff",
@@ -41,5 +40,6 @@
         "statusBar.background": "#999233",
         "statusBar.foreground": "#15202b",
         "sash.hoverBorder": "#999233"
-    }
+    },
+    "window.title": "shturman"
 }

@@ -39,7 +39,7 @@ async def generate_insight_box(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(ReframingSession).where(ReframingSession.user_id == user_id).order_by(ReframingSession.created_at.desc()).limit(20)
@@ -78,7 +78,7 @@ async def blind_spot(
     from app.models.models import BlindSpotSession
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     system_prompt = get_prompt("blind_spot")
 
@@ -114,7 +114,7 @@ async def ai_advocate(
     """ИИ-адвокат (бонус Н3)."""
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     system_prompt = get_prompt("ai_advocate")
 

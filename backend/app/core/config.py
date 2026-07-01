@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     VK_WEB_CLIENT_SECRET: str = ""
     VK_SERVICE_TOKEN: str = ""
 
+    # VK Group ID — закрытая группа, доступ только для участников
+    # Если не задан — проверка членства отключена (любой VK-пользователь)
+    VK_GROUP_ID: int = 0
+
     # Domain
     DOMAIN: str = "vnutrenniy-kompas.ru"
 
@@ -47,11 +51,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "https://vnutrenniy-kompas.ru",
         "http://vnutrenniy-kompas.ru",
-        # VK Mini App iframe domain
-        "https://prod-app54657016-*.vk-apps.com",
         "https://vk.com",
         "https://id.vk.com",
     ]
+
+    # VK Mini App iframe origin regex — matches prod-app54657016-*.vk-apps.com
+    CORS_ORIGIN_REGEX: str = r"https://prod-app54657016-.+\.vk-apps\.com"
 
     # Rate limiting
     RATE_LIMIT_DEFAULT: str = "60/minute"

@@ -66,7 +66,7 @@ async def generate_fractal(
     from app.models.models import ButterflyEvent, FractalCard
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     event = await db.get(ButterflyEvent, body.event_id)
     if not event:
@@ -103,7 +103,7 @@ async def generate_wonder_vault(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(ButterflyEvent).where(ButterflyEvent.user_id == user_id).order_by(ButterflyEvent.event_date.asc()).limit(100)

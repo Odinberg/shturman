@@ -52,7 +52,7 @@ async def generate_mirror_letter(
     from app.models.models import ShadowRecording, MirrorLetter
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     rec = await db.get(ShadowRecording, recording_id)
     if not rec:
@@ -86,7 +86,7 @@ async def generate_forbidden_desire(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(ShadowRecording).where(ShadowRecording.user_id == user_id).order_by(ShadowRecording.created_at.desc()).limit(3)
@@ -132,7 +132,7 @@ async def generate_anti_hero_comic(
     from sqlalchemy import select
     from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.services.ai import safe_ai_call
+    from app.core.ai import safe_ai_call
 
     result = await db.execute(
         select(ForbiddenDesire).where(ForbiddenDesire.user_id == user_id).order_by(ForbiddenDesire.created_at.desc()).limit(1)

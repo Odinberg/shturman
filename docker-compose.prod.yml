@@ -43,6 +43,7 @@ services:
       VK_APP_SECRET: ${VK_APP_SECRET}
       VK_WEB_CLIENT_SECRET: ${VK_WEB_CLIENT_SECRET}
       VK_SERVICE_TOKEN: ${VK_SERVICE_TOKEN}
+      VK_GROUP_ID: ${VK_GROUP_ID:-0}
       DEBUG: "false"
     ports:
       - "9091:8000"
@@ -60,7 +61,7 @@ services:
     container_name: shturman-frontend
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: https://vnutrenniy-kompas.ru/api
+      NEXT_PUBLIC_API_URL: /api
     ports:
       - "9090:3000"
     depends_on: [backend]
