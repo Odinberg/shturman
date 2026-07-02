@@ -18,6 +18,7 @@ from app.services.prompts import reload_prompts, list_prompts
 
 # Ensure all models are registered on Base.metadata before create_all
 import app.models.models  # noqa: F401
+import app.core.sessions.models  # noqa: F401 — RefreshSession
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT_DEFAULT])
