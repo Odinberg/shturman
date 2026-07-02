@@ -4,7 +4,7 @@ API router — все эндпоинты Штурмана.
 
 from fastapi import APIRouter
 
-from app.api.routes import health, vk_auth
+from app.api.routes import health
 from app.api.routes import journal
 from app.api.routes import emotional
 from app.api.routes import reframing
@@ -12,12 +12,13 @@ from app.api.routes import shadow
 from app.api.routes import sensory
 from app.api.routes import multiplicity
 from app.api.routes import butterfly
+from app.auth.router import router as auth_router
 
 api_router = APIRouter()
 
 # System
 api_router.include_router(health.router, tags=["health"])
-api_router.include_router(vk_auth.router, prefix="/auth", tags=["vk-auth"])
+api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 # Direction 1 — Активный дневник
 api_router.include_router(journal.router, prefix="/journal", tags=["journal"])

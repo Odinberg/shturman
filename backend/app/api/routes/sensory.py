@@ -9,7 +9,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.database import get_db
-from app.core.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user
 from app.api.schemas import SensoryCheckinCreate, ApiResponse
 
 router = APIRouter()

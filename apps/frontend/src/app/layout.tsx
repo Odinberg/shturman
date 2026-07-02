@@ -1,5 +1,6 @@
 import { Inter, Cormorant_Garamond } from 'next/font/google';
 import { VkBridgeProvider } from '../lib/vk-bridge';
+import { AuthProvider } from '../lib/auth/AuthProvider';
 
 const inter = Inter({
   subsets: ['cyrillic', 'latin'],
@@ -282,7 +283,9 @@ export default function RootLayout({
         </header>
 
         <main className="main-content">
-          <VkBridgeProvider>{children}</VkBridgeProvider>
+          <VkBridgeProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </VkBridgeProvider>
         </main>
 
         <footer className="main-footer">

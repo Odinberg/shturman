@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { authAPI, setAuthToken } from './api';
+import { authAPI, setAuthToken, getAuthToken } from './api';
 
 interface VkAuthState {
   ready: boolean;
@@ -12,15 +12,22 @@ interface VkAuthState {
 
 /**
  * Хук для аутентификации через VK Mini App.
- * Автоматически извлекает VK-параметры из URL,
- * проверяет подпись через бэкенд и сохраняет JWT токен.
+ *
+ * Порядок:
+ * 1. Сразу восстанавливает токен из localStorage (hydration).
+ * 2. Если есть VK-параметры в URL — обменивает их на JWT через бэкенд.
+ * 3. ready = true означает: токен либо получен, либо VK-параметров нет.
  */
 export function useVkAuth(): VkAuthState {
-  const [state, setState] = useState<VkAuthState>({
-    ready: false,
-    userId: null,
-    username: null,
-    error: null,
+  const [state, setState] = useState<VkAuthState>(() => {
+    // ⚡ Hydration: сразу читаем токен из localStorage при первом рендере
+    const existingToken = getAuthToken();
+    return {
+      ready: !!existingToken,  // если токен уже есть — готовы сразу
+      userId: null,
+      username: null,
+      error: null,
+    };
   });
 
   useEffect(() => {
@@ -28,13 +35,14 @@ export function useVkAuth(): VkAuthState {
 
     async function auth() {
       try {
-        // Парсим URL параметры
+        // Парсим VK параметры из URL
         const params = new URLSearchParams(window.location.search);
         const vkUserId = params.get('vk_user_id');
 
         if (!vkUserId) {
-          // Не VK Mini App — считаем готовым без авторизации
-          if (!cancelled) setState({ ready: true, userId: null, username: null, error: null });
+          // Не VK Mini App — если токен уже был из localStorage, ready уже true.
+          // Если нет — всё равно ready, но без авторизации.
+          if (!cancelled) setState(s => ({ ...s, ready: true }));
           return;
         }
 
@@ -59,6 +67,7 @@ export function useVkAuth(): VkAuthState {
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Ошибка авторизации';
         if (!cancelled) {
+          // Даже при ошибке — ready, чтобы не блокировать UI навечно
           setState({ ready: true, userId: null, username: null, error: message });
         }
       }

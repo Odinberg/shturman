@@ -22,10 +22,14 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # Auth
+    # Auth — JWT
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15          # 15 minutes
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30             # 30 days
+    JWT_ISSUER: str = "shturman"
+    JWT_AUDIENCE: str = "vk-mini-app"
+    JWT_EXPIRE_MINUTES: int = 60 * 24  # deprecated, use ACCESS_TOKEN_EXPIRE_MINUTES
 
     # AI Provider (OpenAI-compatible: OpenAI, DeepSeek, etc.)
     OPENAI_API_KEY: str = ""
