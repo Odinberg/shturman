@@ -66,9 +66,8 @@ async def generate_pattern_map(
     from app.models.models import JournalEntry, PatternMap
     from sqlalchemy import select
     from datetime import datetime, timedelta, timezone
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=21)
     result = await db.execute(
@@ -85,7 +84,7 @@ async def generate_pattern_map(
         f"[{e.created_at.strftime('%d.%m')}] {e.content}" for e in entries
     )
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     pattern_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt,
@@ -115,9 +114,8 @@ async def generate_alt_reality(
 ):
     """Создать альтернативную реальность для записи (бонус Н1)."""
     from app.models.models import JournalEntry, AltRealitySession
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     entry = await db.get(JournalEntry, body.entry_id)
     if not entry:
@@ -125,7 +123,7 @@ async def generate_alt_reality(
 
     system_prompt = get_prompt("alt_reality")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     rewritten = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt,

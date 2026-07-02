@@ -37,9 +37,8 @@ async def generate_insight_box(
     """Шкатулка формулировок (бонус Н3)."""
     from app.models.models import ReframingSession, InsightBox
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(ReframingSession).where(ReframingSession.user_id == user_id).order_by(ReframingSession.created_at.desc()).limit(20)
@@ -53,7 +52,7 @@ async def generate_insight_box(
         f"[{s.created_at.strftime('%d.%m')}] Ситуация: {s.situation_text[:300]}" for s in sessions
     )
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     box_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Разобранные ситуации:\n\n{data}",
@@ -76,13 +75,12 @@ async def blind_spot(
 ):
     """Слепое пятно (бонус Н3)."""
     from app.models.models import BlindSpotSession
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     system_prompt = get_prompt("blind_spot")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     result_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=body.query,
@@ -112,13 +110,12 @@ async def ai_advocate(
     user_id: int = Depends(get_current_user),
 ):
     """ИИ-адвокат (бонус Н3)."""
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     system_prompt = get_prompt("ai_advocate")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     response = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=body.query,

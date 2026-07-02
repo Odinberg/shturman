@@ -69,9 +69,8 @@ async def generate_biorhythm(
     """Генерировать отчёт биоритмолога (бонус Н2)."""
     from app.models.models import EmotionalCheckin, BiorhythmReport
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
     from datetime import datetime, timedelta, timezone
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
@@ -90,7 +89,7 @@ async def generate_biorhythm(
         for c in checkins
     )
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     report_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Вот {len(checkins)} чекинов за 14+ дней:\n\n{data}",
@@ -127,9 +126,8 @@ async def generate_resource_collection(
     """Генерировать коллекцию ресурсных состояний (бонус Н2)."""
     from app.models.models import JournalEntry, ResourceCollection
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(JournalEntry).where(JournalEntry.user_id == user_id).order_by(JournalEntry.created_at.desc()).limit(50)
@@ -139,7 +137,7 @@ async def generate_resource_collection(
     system_prompt = get_prompt("resource_states")
     data = "\n\n".join(f"[{e.created_at.strftime('%d.%m')}] {e.content}" for e in entries)
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     resources = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Вот записи за месяц:\n\n{data}",
@@ -178,7 +176,6 @@ async def generate_avatar(
     """Генерировать эмоциональный аватар недели (бонус Н2)."""
     from app.models.models import EmotionalCheckin, EmotionalAvatar
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
     from app.core.ai import safe_ai_call
     from datetime import datetime, timedelta, timezone
@@ -196,7 +193,7 @@ async def generate_avatar(
     system_prompt = get_prompt("emotional_avatar")
     data = "\n".join(f"[{c.checkin_time.strftime('%a %H:%M')}] {c.emoji} — {c.event_words}" for c in checkins)
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     avatar_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Чекины за эту неделю:\n\n{data}",

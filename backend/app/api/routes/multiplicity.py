@@ -68,9 +68,8 @@ async def generate_round_table(
     """Круглый стол (бонус Н6)."""
     from app.models.models import SubpersonalityPost, RoundTableSession
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -82,7 +81,7 @@ async def generate_round_table(
     system_prompt = get_prompt("round_table")
     data = "\n\n".join(f"[{p.subpersonality}] {p.content}" for p in posts)
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     dialogue = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Голоса капитана:\n\n{data}",
@@ -111,9 +110,8 @@ async def generate_family_portrait(
     """Портрет семьи (бонус Н6)."""
     from app.models.models import SubpersonalityPost, FamilyPortrait
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(SubpersonalityPost).where(SubpersonalityPost.user_id == user_id).order_by(SubpersonalityPost.post_date.desc()).limit(10)
@@ -125,7 +123,7 @@ async def generate_family_portrait(
     system_prompt = get_prompt("family_portrait")
     data = "\n\n".join(f"[{p.subpersonality}] {p.content}" for p in posts)
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     portrait = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Субличности капитана:\n\n{data}",
@@ -157,13 +155,12 @@ async def run_negotiator(
 ):
     """Переговорщик vs Критик (бонус Н6)."""
     from app.models.models import NegotiatorSession
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     system_prompt = get_prompt("negotiator")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     dialogue = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=body.critic_quote,

@@ -50,9 +50,8 @@ async def generate_mirror_letter(
 ):
     """Зеркальный дублёр (бонус Н4)."""
     from app.models.models import ShadowRecording, MirrorLetter
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     rec = await db.get(ShadowRecording, recording_id)
     if not rec:
@@ -60,7 +59,7 @@ async def generate_mirror_letter(
 
     system_prompt = get_prompt("mirror_double")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     letter_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt,
@@ -84,9 +83,8 @@ async def generate_forbidden_desire(
     """Карта запретных желаний (бонус Н4)."""
     from app.models.models import ShadowRecording, ForbiddenDesire
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(ShadowRecording).where(ShadowRecording.user_id == user_id).order_by(ShadowRecording.created_at.desc()).limit(3)
@@ -101,7 +99,7 @@ async def generate_forbidden_desire(
         for r in recordings
     )
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     desire_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Три разбора:\n\n{data}",
@@ -130,9 +128,8 @@ async def generate_anti_hero_comic(
     """Анти-герой комикс (бонус Н4)."""
     from app.models.models import ForbiddenDesire, AntiHeroComic
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(ForbiddenDesire).where(ForbiddenDesire.user_id == user_id).order_by(ForbiddenDesire.created_at.desc()).limit(1)
@@ -143,7 +140,7 @@ async def generate_anti_hero_comic(
 
     system_prompt = get_prompt("anti_hero")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     comic_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"Тень капитана: {fd.desire_text[:500]}",

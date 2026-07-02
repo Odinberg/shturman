@@ -347,7 +347,6 @@ class SubpersonalityPost(Base):
     post_date: Mapped[date] = mapped_column(Date, default=_today)
 
     user = relationship("User", back_populates="subpersonality_posts")
-    __table_args__ = (UniqueConstraint("user_id", "post_date"),)
 
 
 class RoundTableSession(Base):

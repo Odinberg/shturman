@@ -64,9 +64,8 @@ async def generate_fractal(
 ):
     """Фрактал дня (бонус Н7)."""
     from app.models.models import ButterflyEvent, FractalCard
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     event = await db.get(ButterflyEvent, body.event_id)
     if not event:
@@ -74,7 +73,7 @@ async def generate_fractal(
 
     system_prompt = get_prompt("fractal_day")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     insight = await safe_ai_call(
         client=client,
         model=settings.OPENAI_MODEL,
@@ -101,9 +100,8 @@ async def generate_wonder_vault(
     """Копилка чудес (бонус Н7)."""
     from app.models.models import ButterflyEvent, WonderVault
     from sqlalchemy import select
-    from openai import AsyncOpenAI
     from app.core.config import settings
-    from app.core.ai import safe_ai_call
+    from app.core.ai import safe_ai_call, get_ai_client
 
     result = await db.execute(
         select(ButterflyEvent).where(ButterflyEvent.user_id == user_id).order_by(ButterflyEvent.event_date.asc()).limit(100)
@@ -115,7 +113,7 @@ async def generate_wonder_vault(
     system_prompt = get_prompt("wonder_vault")
     data = "\n".join(f"[{e.event_date}] {e.event_text}" for e in events)
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = get_ai_client()
     vault_text = await safe_ai_call(
         client=client, model=settings.OPENAI_MODEL,
         system=system_prompt, user=f"30 событий месяца:\n\n{data}",
